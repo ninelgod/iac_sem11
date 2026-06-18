@@ -1,7 +1,6 @@
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
-# --- SNS Topic for Alarms ---
 
 resource "aws_sns_topic" "alarms" {
   name              = "${var.name_prefix}-alarms"
@@ -16,7 +15,6 @@ resource "aws_sns_topic_subscription" "email" {
   endpoint  = var.alarm_email
 }
 
-# --- CloudWatch Log Groups ---
 
 resource "aws_cloudwatch_log_group" "ecs_usuarios" {
   name              = "/ecs/${var.name_prefix}/usuarios"
@@ -46,7 +44,6 @@ resource "aws_cloudwatch_log_group" "aurora" {
   tags              = { Name = "${var.name_prefix}-aurora-logs" }
 }
 
-# --- S3 Bucket for ALB Access Logs ---
 
 resource "aws_s3_bucket" "alb_logs" {
   bucket        = "${var.name_prefix}-alb-access-logs"
@@ -64,7 +61,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "alb_logs" {
   bucket = aws_s3_bucket.alb_logs.id
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = var.kms_key_arn
     }
   }
 }
@@ -86,7 +84,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "alb_logs" {
   }
 }
 
-# ALB access logging policy — AWS ELB service account needs write access
 data "aws_elb_service_account" "main" {}
 
 resource "aws_s3_bucket_policy" "alb_logs" {
@@ -114,7 +111,6 @@ resource "aws_s3_bucket_policy" "alb_logs" {
   })
 }
 
-# --- S3 Bucket for CloudFront Logs ---
 
 resource "aws_s3_bucket" "cloudfront_logs" {
   bucket        = "${var.name_prefix}-cloudfront-access-logs"
@@ -132,7 +128,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "cloudfront_logs" 
   bucket = aws_s3_bucket.cloudfront_logs.id
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = var.kms_key_arn
     }
   }
 }
@@ -169,4 +166,3 @@ resource "aws_s3_bucket_policy" "cloudfront_logs" {
     }]
   })
 }
-
