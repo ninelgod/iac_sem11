@@ -46,10 +46,18 @@ resource "aws_cloudwatch_log_group" "aurora" {
 
 
 resource "aws_s3_bucket" "alb_logs" {
+  #checkov:skip=CKV_AWS_144:Bucket de logs de una sola region; los logs expiran a los 365 dias, no se justifica replicacion cross-region
+  #checkov:skip=CKV2_AWS_62:Bucket de logs sin consumidores de eventos; nadie procesa estos logs via notificaciones S3
   bucket        = "${var.name_prefix}-alb-access-logs"
   force_destroy = false
 
   tags = { Name = "${var.name_prefix}-alb-access-logs" }
+}
+
+resource "aws_s3_bucket_logging" "alb_logs" {
+  bucket        = aws_s3_bucket.alb_logs.id
+  target_bucket = aws_s3_bucket.cloudfront_logs.id
+  target_prefix = "s3-access/alb-logs/"
 }
 
 resource "aws_s3_bucket_versioning" "alb_logs" {
@@ -81,6 +89,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "alb_logs" {
     id     = "expire-old-logs"
     status = "Enabled"
     expiration { days = 365 }
+    abort_incomplete_multipart_upload { days_after_initiation = 7 }
   }
 }
 
@@ -113,10 +122,18 @@ resource "aws_s3_bucket_policy" "alb_logs" {
 
 
 resource "aws_s3_bucket" "cloudfront_logs" {
+  #checkov:skip=CKV_AWS_144:Bucket de logs de una sola region; los logs expiran a los 365 dias, no se justifica replicacion cross-region
+  #checkov:skip=CKV2_AWS_62:Bucket de logs sin consumidores de eventos; nadie procesa estos logs via notificaciones S3
   bucket        = "${var.name_prefix}-cloudfront-access-logs"
   force_destroy = false
 
   tags = { Name = "${var.name_prefix}-cloudfront-access-logs" }
+}
+
+resource "aws_s3_bucket_logging" "cloudfront_logs" {
+  bucket        = aws_s3_bucket.cloudfront_logs.id
+  target_bucket = aws_s3_bucket.alb_logs.id
+  target_prefix = "s3-access/cloudfront-logs/"
 }
 
 resource "aws_s3_bucket_versioning" "cloudfront_logs" {
@@ -148,6 +165,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs" {
     id     = "expire-old-logs"
     status = "Enabled"
     expiration { days = 365 }
+    abort_incomplete_multipart_upload { days_after_initiation = 7 }
   }
 }
 
