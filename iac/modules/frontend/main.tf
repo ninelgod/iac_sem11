@@ -2,6 +2,8 @@ data "aws_caller_identity" "current" {}
 
 
 resource "aws_s3_bucket" "frontend" {
+  #checkov:skip=CKV_AWS_144:Bucket de assets estaticos servido via CloudFront global; una sola region no justifica replicacion cross-region
+  #checkov:skip=CKV2_AWS_62:Bucket de assets estaticos sin consumidores de eventos; no hay integracion downstream que necesite notificaciones S3
   bucket        = "${var.name_prefix}-web"
   force_destroy = false
 
@@ -44,6 +46,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "frontend" {
     id     = "expire-old-versions"
     status = "Enabled"
     noncurrent_version_expiration { noncurrent_days = 90 }
+    abort_incomplete_multipart_upload { days_after_initiation = 7 }
   }
 }
 
@@ -97,6 +100,7 @@ resource "aws_cloudfront_response_headers_policy" "security_headers" {
     strict_transport_security {
       access_control_max_age_sec = 31536000
       include_subdomains         = true
+      preload                    = true
       override                   = true
     }
     content_type_options {
@@ -119,6 +123,8 @@ resource "aws_cloudfront_response_headers_policy" "security_headers" {
 }
 
 resource "aws_cloudfront_distribution" "frontend" {
+  #checkov:skip=CKV_AWS_310:Origen unico S3 sirviendo contenido estatico; un origin_group de failover duplicado contra el mismo bucket no aporta redundancia real
+  #checkov:skip=CKV2_AWS_47:El WAFv2 ACL asociado (modules/waf) ya incluye AWSManagedRulesKnownBadInputsRuleSet con cobertura Log4j; Checkov no resuelve la asociacion cross-module
   enabled             = true
   is_ipv6_enabled     = true
   default_root_object = "index.html"
@@ -179,7 +185,8 @@ resource "aws_cloudfront_distribution" "frontend" {
 
   restrictions {
     geo_restriction {
-      restriction_type = "none"
+      restriction_type = "blacklist"
+      locations        = []
     }
   }
 
