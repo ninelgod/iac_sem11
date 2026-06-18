@@ -1,5 +1,7 @@
 # --- ALB Security Group ---
 resource "aws_security_group" "alb" {
+  #checkov:skip=CKV_AWS_260:Puerto 80 requerido para el listener de redirect HTTP->HTTPS; no se sirve contenido de la app por este puerto
+  #checkov:skip=CKV2_AWS_5:Atachado via output de modulo (module.security_groups.alb_sg_id) consumido por modules/alb; Checkov no resuelve referencias cross-module
   name        = "${var.name_prefix}-alb-sg"
   description = "Security group for Application Load Balancer"
   vpc_id      = var.vpc_id
@@ -33,6 +35,7 @@ resource "aws_security_group" "alb" {
 
 # --- ECS Tasks Security Group ---
 resource "aws_security_group" "ecs" {
+  #checkov:skip=CKV2_AWS_5:Atachado via output de modulo (module.security_groups.ecs_sg_id) consumido por modules/ecs; Checkov no resuelve referencias cross-module
   name        = "${var.name_prefix}-ecs-sg"
   description = "Security group for ECS Fargate tasks"
   vpc_id      = var.vpc_id
@@ -66,6 +69,7 @@ resource "aws_security_group" "ecs" {
 
 # --- Aurora Security Group ---
 resource "aws_security_group" "aurora" {
+  #checkov:skip=CKV2_AWS_5:Atachado via output de modulo (module.security_groups.aurora_sg_id) consumido por modules/aurora; Checkov no resuelve referencias cross-module
   name        = "${var.name_prefix}-aurora-sg"
   description = "Security group for Aurora PostgreSQL cluster"
   vpc_id      = var.vpc_id
