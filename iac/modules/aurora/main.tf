@@ -61,19 +61,15 @@ resource "aws_rds_cluster" "main" {
   final_snapshot_identifier = "${var.name_prefix}-final-snapshot"
   deletion_protection       = true
 
-  # IAM auth
   iam_database_authentication_enabled = true
 
-  # Logs to CloudWatch
   enabled_cloudwatch_logs_exports = ["postgresql"]
 
-  # Maintenance
   preferred_maintenance_window = "sun:05:00-sun:06:00"
 
   tags = { Name = "${var.name_prefix}-aurora-cluster" }
 }
 
-# Primary instance (us-east-2a)
 resource "aws_rds_cluster_instance" "primary" {
   identifier           = "${var.name_prefix}-aurora-primary"
   cluster_identifier   = aws_rds_cluster.main.id
@@ -86,11 +82,11 @@ resource "aws_rds_cluster_instance" "primary" {
   monitoring_role_arn  = aws_iam_role.rds_monitoring.arn
   performance_insights_enabled    = true
   performance_insights_kms_key_id = var.kms_key_arn
+  auto_minor_version_upgrade      = true
 
   tags = { Name = "${var.name_prefix}-aurora-primary" }
 }
 
-# Secondary instance (us-east-2b) — sync failover
 resource "aws_rds_cluster_instance" "secondary" {
   identifier           = "${var.name_prefix}-aurora-secondary"
   cluster_identifier   = aws_rds_cluster.main.id
@@ -103,11 +99,11 @@ resource "aws_rds_cluster_instance" "secondary" {
   monitoring_role_arn  = aws_iam_role.rds_monitoring.arn
   performance_insights_enabled    = true
   performance_insights_kms_key_id = var.kms_key_arn
+  auto_minor_version_upgrade      = true
 
   tags = { Name = "${var.name_prefix}-aurora-secondary" }
 }
 
-# --- Enhanced Monitoring Role ---
 
 resource "aws_iam_role" "rds_monitoring" {
   name = "${var.name_prefix}-rds-monitoring-role"
