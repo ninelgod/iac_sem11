@@ -60,12 +60,67 @@ resource "aws_kms_alias" "tfstate" {
   target_key_id = aws_kms_key.tfstate.key_id
 }
 
+# --- S3 Bucket para los access logs del tfstate ---
+# checkov:skip=CKV_AWS_18:Bucket destino de access logs; habilitarle logging propio crearia un ciclo
+resource "aws_s3_bucket" "tfstate_access_logs" {
+  bucket        = "${var.project_name}-tfstate-access-logs"
+  force_destroy = false
+
+  tags = { Name = "${var.project_name}-tfstate-access-logs" }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "tfstate_access_logs" {
+  bucket = aws_s3_bucket.tfstate_access_logs.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.tfstate.arn
+    }
+    bucket_key_enabled = true
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "tfstate_access_logs" {
+  bucket                  = aws_s3_bucket.tfstate_access_logs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "tfstate_access_logs" {
+  bucket = aws_s3_bucket.tfstate_access_logs.id
+  rule {
+    id     = "expire-old-logs"
+    status = "Enabled"
+    expiration { days = 365 }
+    abort_incomplete_multipart_upload { days_after_initiation = 7 }
+  }
+}
+
 # --- S3 Bucket para el tfstate ---
+# checkov:skip=CKV_AWS_144:Bucket de estado de Terraform de una sola region; la replicacion cross-region no aplica a este stack de bootstrap
+# checkov:skip=CKV2_AWS_62:Bucket de estado sin consumidores de eventos; no hay integracion downstream que necesite notificaciones S3
 resource "aws_s3_bucket" "tfstate" {
   bucket        = "${var.project_name}-tfstate"
   force_destroy = false
 
   tags = { Name = "${var.project_name}-tfstate" }
+}
+
+resource "aws_s3_bucket_logging" "tfstate" {
+  bucket        = aws_s3_bucket.tfstate.id
+  target_bucket = aws_s3_bucket.tfstate_access_logs.id
+  target_prefix = "tfstate-access-logs/"
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "tfstate" {
+  bucket = aws_s3_bucket.tfstate.id
+  rule {
+    id     = "abort-incomplete-uploads"
+    status = "Enabled"
+    abort_incomplete_multipart_upload { days_after_initiation = 7 }
+  }
 }
 
 resource "aws_s3_bucket_versioning" "tfstate" {
