@@ -1,6 +1,5 @@
 data "aws_caller_identity" "current" {}
 
-# --- S3 Bucket for Frontend Assets ---
 
 resource "aws_s3_bucket" "frontend" {
   bucket        = "${var.name_prefix}-web"
@@ -48,7 +47,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "frontend" {
   }
 }
 
-# --- CloudFront Origin Access Control ---
 
 resource "aws_cloudfront_origin_access_control" "frontend" {
   name                              = "${var.name_prefix}-oac"
@@ -58,7 +56,6 @@ resource "aws_cloudfront_origin_access_control" "frontend" {
   signing_protocol                  = "sigv4"
 }
 
-# --- S3 Bucket Policy (allow only CloudFront OAC) ---
 
 resource "aws_s3_bucket_policy" "frontend" {
   bucket = aws_s3_bucket.frontend.id
@@ -92,7 +89,34 @@ resource "aws_s3_bucket_policy" "frontend" {
   depends_on = [aws_s3_bucket_public_access_block.frontend]
 }
 
-# --- CloudFront Distribution ---
+
+resource "aws_cloudfront_response_headers_policy" "security_headers" {
+  name = "${var.name_prefix}-security-headers"
+
+  security_headers_config {
+    strict_transport_security {
+      access_control_max_age_sec = 31536000
+      include_subdomains         = true
+      override                   = true
+    }
+    content_type_options {
+      override = true
+    }
+    frame_options {
+      frame_option = "DENY"
+      override     = true
+    }
+    xss_protection {
+      mode_block = true
+      override   = true
+      protection = true
+    }
+    referrer_policy {
+      referrer_policy = "strict-origin-when-cross-origin"
+      override        = true
+    }
+  }
+}
 
 resource "aws_cloudfront_distribution" "frontend" {
   enabled             = true
@@ -113,8 +137,9 @@ resource "aws_cloudfront_distribution" "frontend" {
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
     cached_methods         = ["GET", "HEAD"]
     target_origin_id       = "S3-${aws_s3_bucket.frontend.id}"
-    viewer_protocol_policy = "redirect-to-https"
-    compress               = true
+    viewer_protocol_policy     = "redirect-to-https"
+    compress                   = true
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security_headers.id
 
     forwarded_values {
       query_string = false
@@ -126,7 +151,6 @@ resource "aws_cloudfront_distribution" "frontend" {
     max_ttl     = 31536000
   }
 
-  # SPA fallback — serve index.html for all 404s
   custom_error_response {
     error_code            = 403
     response_code         = 200
@@ -162,7 +186,6 @@ resource "aws_cloudfront_distribution" "frontend" {
   tags = { Name = "${var.name_prefix}-cf" }
 }
 
-# --- Route 53 ---
 
 data "aws_route53_zone" "main" {
   name         = "${var.domain_name}."
