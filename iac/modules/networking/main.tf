@@ -248,3 +248,8 @@ resource "aws_flow_log" "main" {
 
   tags = { Name = "${var.name_prefix}-flow-log" }
 }
+
+resource "aws_default_security_group" "default" {
+  vpc_id = aws_vpc.main.id
+  tags   = { Name = "${var.name_prefix}-default-sg-lockdown" }
+}
