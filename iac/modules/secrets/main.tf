@@ -64,6 +64,66 @@ resource "aws_iam_role_policy_attachment" "rotation_lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+resource "aws_iam_role_policy_attachment" "rotation_lambda_vpc" {
+  role       = aws_iam_role.rotation_lambda.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+resource "aws_security_group" "rotation_lambda" {
+  name        = "${var.name_prefix}-secret-rotation-lambda-sg"
+  description = "Security group for the Secrets Manager rotation Lambda"
+  vpc_id      = var.vpc_id
+
+  egress {
+    description = "HTTPS to AWS services (Secrets Manager, KMS) via VPC endpoints/NAT"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = { Name = "${var.name_prefix}-secret-rotation-lambda-sg" }
+}
+
+resource "aws_sqs_queue" "rotation_dlq" {
+  name                      = "${var.name_prefix}-secret-rotation-dlq"
+  kms_master_key_id         = var.kms_key_arn
+  message_retention_seconds = 1209600
+
+  tags = { Name = "${var.name_prefix}-secret-rotation-dlq" }
+}
+
+resource "aws_iam_role_policy" "rotation_lambda_dlq" {
+  name = "${var.name_prefix}-secret-rotation-dlq-policy"
+  role = aws_iam_role.rotation_lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["sqs:SendMessage"]
+      Resource = aws_sqs_queue.rotation_dlq.arn
+    }]
+  })
+}
+
+resource "aws_signer_signing_profile" "rotation_lambda" {
+  platform_id = "AWSLambda-SHA384-ECDSA"
+  name_prefix = "secret_rotation_"
+
+  tags = { Name = "${var.name_prefix}-secret-rotation-signing-profile" }
+}
+
+resource "aws_lambda_code_signing_config" "rotation_lambda" {
+  allowed_publishers {
+    signing_profile_version_arns = [aws_signer_signing_profile.rotation_lambda.version_arn]
+  }
+
+  policies {
+    untrusted_artifact_on_deployment = "Enforce"
+  }
+}
+
 resource "aws_iam_role_policy" "rotation_lambda" {
   name = "${var.name_prefix}-secret-rotation-policy"
   role = aws_iam_role.rotation_lambda.id
@@ -101,17 +161,30 @@ resource "aws_lambda_function" "rotate_secret" {
   filename         = data.archive_file.rotation_lambda.output_path
   source_code_hash = data.archive_file.rotation_lambda.output_base64sha256
 
+  kms_key_arn                   = var.kms_key_arn
+  reserved_concurrent_executions = 5
+  code_signing_config_arn        = aws_lambda_code_signing_config.rotation_lambda.arn
+
   environment {
     variables = {
       SECRETS_MANAGER_ENDPOINT = "https://secretsmanager.${data.aws_region.current.name}.amazonaws.com"
     }
   }
 
+  vpc_config {
+    subnet_ids         = var.subnet_ids
+    security_group_ids = [aws_security_group.rotation_lambda.id]
+  }
+
+  dead_letter_config {
+    target_arn = aws_sqs_queue.rotation_dlq.arn
+  }
+
   tracing_config {
     mode = "Active"
   }
 
-  depends_on = [aws_cloudwatch_log_group.rotation_lambda]
+  depends_on = [aws_cloudwatch_log_group.rotation_lambda, aws_iam_role_policy_attachment.rotation_lambda_vpc]
 }
 
 resource "aws_lambda_permission" "secrets_manager" {
@@ -119,4 +192,5 @@ resource "aws_lambda_permission" "secrets_manager" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.rotate_secret.function_name
   principal     = "secretsmanager.amazonaws.com"
+  source_arn    = aws_secretsmanager_secret.db.arn
 }

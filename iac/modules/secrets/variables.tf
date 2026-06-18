@@ -14,3 +14,11 @@ variable "db_master_username" {
   type      = string
   sensitive = true
 }
+
+variable "vpc_id" {
+  type = string
+}
+
+variable "subnet_ids" {
+  type = list(string)
+}

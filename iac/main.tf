@@ -34,11 +34,13 @@ module "ecr" {
 }
 
 module "secrets" {
-  source             = "./modules/secrets"
-  name_prefix        = local.name_prefix
-  kms_key_arn        = module.kms.secrets_key_arn
-  db_name            = var.db_name
-  db_master_username = var.db_master_username
+  source              = "./modules/secrets"
+  name_prefix         = local.name_prefix
+  kms_key_arn         = module.kms.secrets_key_arn
+  db_name             = var.db_name
+  db_master_username  = var.db_master_username
+  vpc_id              = module.networking.vpc_id
+  subnet_ids          = module.networking.private_subnet_ids
 }
 
 module "waf" {
