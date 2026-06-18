@@ -1,0 +1,20 @@
+aws_region   = "us-east-2"
+environment  = "prod"
+project_name = "gestorpagosg2"
+domain_name  = "gestorpagosg2.com"
+
+# ACM certificate (us-east-2) — must exist before apply
+certificate_arn = "arn:aws:acm:us-east-2:123456789012:certificate/REPLACE-ME"
+
+# ACM certificate (us-east-1) — required for CloudFront
+cloudfront_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/REPLACE-ME"
+
+# Aurora
+db_name            = "gestorpagosg2db"
+db_master_username = "dbadmin"
+
+# SNS alarm notifications
+alarm_email = "ops@gestorpagosg2.com"
+
+# ECS image tag (updated by CI/CD)
+ecr_image_tag = "latest"

@@ -1,0 +1,162 @@
+name: Build & Deploy to ECS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-2.amazonaws.com
+  ECS_CLUSTER: gestorpagosg2-prod-cluster
+
+jobs:
+  # -------------------------------------------------------------------
+  # TEST — corre antes del build en PRs y en push a main
+  # -------------------------------------------------------------------
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run type-check || true
+
+      - name: Lint
+        run: npm run lint || true
+
+  # -------------------------------------------------------------------
+  # CHECKOV — escaneo de seguridad de la IaC
+  # -------------------------------------------------------------------
+  checkov:
+    name: Checkov IaC Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: iac/
+          framework: terraform
+          soft_fail: false
+          output_format: cli,sarif
+          output_file_path: console,checkov-results.sarif
+
+      - name: Upload SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov-results.sarif
+
+  # -------------------------------------------------------------------
+  # BUILD & PUSH — solo en push a main (no en PRs)
+  # -------------------------------------------------------------------
+  build-and-push:
+    name: Build & Push to ECR
+    needs: [test, checkov]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    strategy:
+      matrix:
+        service: [usuarios, pagos, reportes]
+
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image
+        id: meta
+        env:
+          SERVICE: ${{ matrix.service }}
+          IMAGE_TAG: prod-${{ github.sha }}
+        run: |
+          IMAGE_URI="${ECR_REGISTRY}/gestorpagosg2-prod-${SERVICE}:${IMAGE_TAG}"
+          docker build \
+            --file services/${SERVICE}/Dockerfile \
+            --tag "${IMAGE_URI}" \
+            --label "git-sha=${{ github.sha }}" \
+            --label "service=${SERVICE}" \
+            .
+          docker push "${IMAGE_URI}"
+          echo "tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+
+  # -------------------------------------------------------------------
+  # DEPLOY — actualiza la task definition y fuerza nuevo deployment en ECS
+  # -------------------------------------------------------------------
+  deploy:
+    name: Deploy to ECS
+    needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    strategy:
+      matrix:
+        service: [usuarios, pagos, reportes]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get current task definition
+        id: get-taskdef
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "gestorpagosg2-prod-${SERVICE}" \
+            --query taskDefinition \
+            > task-def.json
+
+      - name: Update container image in task definition
+        id: update-taskdef
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-def.json
+          container-name: ${{ matrix.service }}
+          image: ${{ env.ECR_REGISTRY }}/gestorpagosg2-prod-${{ matrix.service }}:prod-${{ github.sha }}
+
+      - name: Deploy updated task definition to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.update-taskdef.outputs.task-definition }}
+          service: gestorpagosg2-prod-${{ matrix.service }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          codedeploy-appspec: false

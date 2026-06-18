@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   Int      @id @default(autoincrement())
+  username             String   @unique @db.VarChar(255)
+  email                String   @unique @db.VarChar(255)
+  password             String   @db.VarChar(255)
+  failedLoginAttempts  Int      @default(0) @map("failed_login_attempts")
+  loginBlockedUntil    DateTime? @map("login_blocked_until") @db.Timestamp(6)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  loans                Loan[]
+
+  @@map("users")
+}
+
+model Loan {
+  id             Int           @id @default(autoincrement())
+  userId         Int           @map("user_id")
+  loanCode       String?       @map("loan_code") @db.VarChar(50)
+  bankName       String        @map("bank_name") @db.VarChar(255)
+  loanType       String        @map("loan_type") @db.VarChar(255)
+  totalAmount    Decimal       @map("total_amount") @db.Decimal(10, 2)
+  finalTotalAmount Decimal     @map("final_total_amount") @db.Decimal(10, 2)
+  monthlyPayment Decimal       @map("monthly_payment") @db.Decimal(10, 2)
+  startDate      DateTime      @map("start_date") @db.Date
+  endDate        DateTime      @map("end_date") @db.Date
+  paymentType    String        @map("payment_type") @db.VarChar(255)
+  interestRate   Decimal?      @map("interest_rate") @db.Decimal(5, 2)
+  isActive       Boolean       @default(true) @map("is_active")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  installments   Installment[]
+  payments       Payment[]
+
+  @@map("loans")
+}
+
+model Installment {
+  id                Int       @id @default(autoincrement())
+  loanId            Int       @map("loan_id")
+  installmentNumber Int       @map("installment_number")
+  dueDate           DateTime  @map("due_date") @db.Date
+  amount            Decimal   @db.Decimal(10, 2)
+  isPaid            Boolean   @default(false) @map("is_paid")
+  paidDate          DateTime? @map("paid_date") @db.Date
+  lateFee           Decimal?  @map("late_fee") @db.Decimal(10, 2)
+  notes             String?   @db.Text
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  loan              Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@map("installments")
+}
+
+model Payment {
+  id           Int      @id @default(autoincrement())
+  loanId       Int      @map("loan_id")
+  amount       Decimal  @db.Decimal(10, 2)
+  paymentDate  DateTime @map("payment_date") @db.Date
+  paymentMonth DateTime @map("payment_month") @db.Date
+  notes        String?  @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  loan         Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model PasswordResetCode {
+  id        Int      @id @default(autoincrement())
+  email     String   @db.VarChar(255)
+  code      String   @db.VarChar(255)
+  expiresAt DateTime @db.Timestamp(6)
+  used      Boolean  @default(false)
+  attempts  Int      @default(0)
+  blockedUntil DateTime? @db.Timestamp(6)
+  ipAddress String   @db.VarChar(45)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@map("password_reset_codes")
+}
