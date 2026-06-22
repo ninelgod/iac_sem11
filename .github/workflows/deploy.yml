@@ -79,9 +79,17 @@ jobs:
 
       - name: Verificar Quality Gate
         run: |
-          STATUS=$(curl -s -u admin:admin \
-            "http://localhost:9000/api/qualitygates/project_status?projectKey=gestor-prestamos" \
-            | jq -r .projectStatus.status)
+          STATUS="NONE"
+          for i in $(seq 1 18); do
+            STATUS=$(curl -s -u admin:admin \
+              "http://localhost:9000/api/qualitygates/project_status?projectKey=gestor-prestamos" \
+              | jq -r .projectStatus.status)
+            if [ "$STATUS" != "NONE" ]; then
+              break
+            fi
+            echo "Esperando a que SonarQube termine de procesar el reporte..."
+            sleep 5
+          done
           echo "Quality Gate: $STATUS"
           if [ "$STATUS" != "OK" ]; then
             echo "El Quality Gate no aprobo el codigo" >&2
