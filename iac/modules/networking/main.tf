@@ -8,7 +8,6 @@ resource "aws_vpc" "main" {
   tags = { Name = "${var.name_prefix}-vpc" }
 }
 
-# --- Public Subnets ---
 
 resource "aws_subnet" "public" {
   count             = length(var.availability_zones)
@@ -21,7 +20,6 @@ resource "aws_subnet" "public" {
   tags = { Name = "${var.name_prefix}-public-${var.availability_zones[count.index]}" }
 }
 
-# --- Private Subnets (ECS) ---
 
 resource "aws_subnet" "private" {
   count             = length(var.availability_zones)
@@ -32,7 +30,6 @@ resource "aws_subnet" "private" {
   tags = { Name = "${var.name_prefix}-private-${var.availability_zones[count.index]}" }
 }
 
-# --- Private DB Subnets (Aurora) ---
 
 resource "aws_subnet" "private_db" {
   count             = length(var.availability_zones)
@@ -43,14 +40,12 @@ resource "aws_subnet" "private_db" {
   tags = { Name = "${var.name_prefix}-private-db-${var.availability_zones[count.index]}" }
 }
 
-# --- Internet Gateway ---
 
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
   tags   = { Name = "${var.name_prefix}-igw" }
 }
 
-# --- NAT Gateways (one per AZ for HA) ---
 
 resource "aws_eip" "nat" {
   count  = length(var.availability_zones)
@@ -67,7 +62,6 @@ resource "aws_nat_gateway" "main" {
   depends_on = [aws_internet_gateway.main]
 }
 
-# --- Route Tables ---
 
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
@@ -116,7 +110,6 @@ resource "aws_route_table_association" "private_db" {
   route_table_id = aws_route_table.private_db.id
 }
 
-# --- VPC Endpoints ---
 
 resource "aws_security_group" "vpc_endpoint" {
   name        = "${var.name_prefix}-vpce-sg"
@@ -197,7 +190,6 @@ resource "aws_vpc_endpoint" "s3" {
 
 data "aws_region" "current" {}
 
-# --- VPC Flow Logs ---
 
 resource "aws_cloudwatch_log_group" "flow_logs" {
   name              = "/aws/vpc/${var.name_prefix}/flow-logs"
