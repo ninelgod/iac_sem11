@@ -12,9 +12,6 @@ env:
   ECS_CLUSTER: gestorpagosg2-prod-cluster
 
 jobs:
-  # -------------------------------------------------------------------
-  # TEST — corre antes del build en PRs y en push a main
-  # -------------------------------------------------------------------
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -41,7 +38,6 @@ jobs:
   # -------------------------------------------------------------------
   sonarqube:
     name: SonarQube Analysis
-    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
