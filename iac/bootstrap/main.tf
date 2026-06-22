@@ -61,12 +61,19 @@ resource "aws_kms_alias" "tfstate" {
 }
 
 # --- S3 Bucket para los access logs del tfstate ---
-# checkov:skip=CKV_AWS_18:Bucket destino de access logs; habilitarle logging propio crearia un ciclo
 resource "aws_s3_bucket" "tfstate_access_logs" {
+  #checkov:skip=CKV_AWS_18:Bucket destino de access logs; habilitarle logging propio crearia un ciclo
+  #checkov:skip=CKV_AWS_144:Bucket de logs de soporte de una sola region; no se justifica replicacion cross-region
+  #checkov:skip=CKV2_AWS_62:Bucket de logs sin consumidores de eventos
   bucket        = "${var.project_name}-tfstate-access-logs"
   force_destroy = false
 
   tags = { Name = "${var.project_name}-tfstate-access-logs" }
+}
+
+resource "aws_s3_bucket_versioning" "tfstate_access_logs" {
+  bucket = aws_s3_bucket.tfstate_access_logs.id
+  versioning_configuration { status = "Enabled" }
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "tfstate_access_logs" {
@@ -99,9 +106,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "tfstate_access_logs" {
 }
 
 # --- S3 Bucket para el tfstate ---
-# checkov:skip=CKV_AWS_144:Bucket de estado de Terraform de una sola region; la replicacion cross-region no aplica a este stack de bootstrap
-# checkov:skip=CKV2_AWS_62:Bucket de estado sin consumidores de eventos; no hay integracion downstream que necesite notificaciones S3
 resource "aws_s3_bucket" "tfstate" {
+  #checkov:skip=CKV_AWS_144:Bucket de estado de Terraform de una sola region; la replicacion cross-region no aplica a este stack de bootstrap
+  #checkov:skip=CKV2_AWS_62:Bucket de estado sin consumidores de eventos; no hay integracion downstream que necesite notificaciones S3
   bucket        = "${var.project_name}-tfstate"
   force_destroy = false
 

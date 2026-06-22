@@ -31,6 +31,7 @@ resource "aws_rds_cluster_parameter_group" "main" {
 }
 
 resource "aws_rds_cluster" "main" {
+  #checkov:skip=CKV2_AWS_8:El cluster ya tiene backups nativos automaticos (backup_retention_period=7, snapshot final, deletion_protection); un AWS Backup plan seria redundante
   cluster_identifier = "${var.name_prefix}-aurora-cluster"
   engine             = "aurora-postgresql"
   engine_mode        = "provisioned"

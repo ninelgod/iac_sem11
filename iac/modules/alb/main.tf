@@ -1,5 +1,5 @@
-# checkov:skip=CKV2_AWS_76:El WAFv2 ACL asociado (modules/waf) ya incluye AWSManagedRulesKnownBadInputsRuleSet con cobertura Log4j; Checkov no resuelve la asociacion cross-module
 resource "aws_lb" "main" {
+  #checkov:skip=CKV2_AWS_76:El WAFv2 ACL asociado (modules/waf) ya incluye AWSManagedRulesKnownBadInputsRuleSet con cobertura Log4j; Checkov no resuelve la asociacion cross-module
   name               = "${var.name_prefix}-alb"
   internal           = false
   load_balancer_type = "application"
@@ -62,8 +62,8 @@ resource "aws_lb_listener" "https" {
 
 # --- Target Groups ---
 
-# checkov:skip=CKV_AWS_378:Trafico de backend confinado a subnets privadas y solo alcanzable desde la SG del ALB; el edge publico ya fuerza HTTPS/TLS1.3 en el listener
 resource "aws_lb_target_group" "usuarios" {
+  #checkov:skip=CKV_AWS_378:Trafico de backend confinado a subnets privadas y solo alcanzable desde la SG del ALB; el edge publico ya fuerza HTTPS/TLS1.3 en el listener
   name        = "${var.name_prefix}-usuarios-tg"
   port        = 3000
   protocol    = "HTTP"
@@ -83,8 +83,8 @@ resource "aws_lb_target_group" "usuarios" {
   tags = { Name = "${var.name_prefix}-usuarios-tg" }
 }
 
-# checkov:skip=CKV_AWS_378:Trafico de backend confinado a subnets privadas y solo alcanzable desde la SG del ALB; el edge publico ya fuerza HTTPS/TLS1.3 en el listener
 resource "aws_lb_target_group" "pagos" {
+  #checkov:skip=CKV_AWS_378:Trafico de backend confinado a subnets privadas y solo alcanzable desde la SG del ALB; el edge publico ya fuerza HTTPS/TLS1.3 en el listener
   name        = "${var.name_prefix}-pagos-tg"
   port        = 3001
   protocol    = "HTTP"
@@ -104,8 +104,8 @@ resource "aws_lb_target_group" "pagos" {
   tags = { Name = "${var.name_prefix}-pagos-tg" }
 }
 
-# checkov:skip=CKV_AWS_378:Trafico de backend confinado a subnets privadas y solo alcanzable desde la SG del ALB; el edge publico ya fuerza HTTPS/TLS1.3 en el listener
 resource "aws_lb_target_group" "reportes" {
+  #checkov:skip=CKV_AWS_378:Trafico de backend confinado a subnets privadas y solo alcanzable desde la SG del ALB; el edge publico ya fuerza HTTPS/TLS1.3 en el listener
   name        = "${var.name_prefix}-reportes-tg"
   port        = 3002
   protocol    = "HTTP"
