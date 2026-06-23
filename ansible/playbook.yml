@@ -1,0 +1,73 @@
+---
+# Playbook que gestiona la configuracion de la cuenta AWS que vive FUERA del
+# estado de Terraform: el OIDC provider y el IAM Role que usa GitHub Actions
+# para autenticarse contra AWS sin access keys. Es idempotente: si ya existe,
+# no lo vuelve a crear.
+- name: Configurar OIDC + IAM Role de GitHub Actions
+  hosts: local
+  gather_facts: false
+  vars_files:
+    - vars.yml
+
+  tasks:
+    - name: Verificar si el OIDC provider de GitHub Actions ya existe
+      command: aws iam list-open-id-connect-providers --output json
+      register: oidc_list
+      changed_when: false
+
+    - name: Crear el OIDC provider de GitHub Actions (si no existe)
+      command: >
+        aws iam create-open-id-connect-provider
+        --url https://token.actions.githubusercontent.com
+        --client-id-list sts.amazonaws.com
+        --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1 1c58a3a8518e8759bf075b76b750d4f2df264fcd
+      when: "'token.actions.githubusercontent.com' not in oidc_list.stdout"
+
+    - name: Generar trust policy del Role (repo de GitHub permitido)
+      template:
+        src: templates/trust-policy.json.j2
+        dest: /tmp/trust-policy.json
+        mode: "0600"
+
+    - name: Generar policy de permisos minimos (ECR push/pull + ECS deploy)
+      template:
+        src: templates/deploy-policy.json.j2
+        dest: /tmp/deploy-policy.json
+        mode: "0600"
+
+    - name: Verificar si el IAM Role ya existe
+      command: "aws iam get-role --role-name {{ oidc_role_name }}"
+      register: role_check
+      failed_when: false
+      changed_when: false
+
+    - name: Crear el IAM Role para GitHub Actions (si no existe)
+      command: >
+        aws iam create-role --role-name {{ oidc_role_name }}
+        --assume-role-policy-document file:///tmp/trust-policy.json
+        --description "Rol OIDC de GitHub Actions para build/push a ECR y deploy a ECS"
+      when: role_check.rc != 0
+
+    - name: Adjuntar/actualizar la policy de permisos en el Role
+      command: >
+        aws iam put-role-policy --role-name {{ oidc_role_name }}
+        --policy-name ecr-ecs-deploy
+        --policy-document file:///tmp/deploy-policy.json
+
+    - name: Verificar que la Hosted Zone de Route53 del dominio exista
+      command: "aws route53 list-hosted-zones-by-name --dns-name {{ domain_name }} --output json"
+      register: zone_check
+      changed_when: false
+
+    - name: Avisar si la Hosted Zone no existe (no se crea por Ansible, ya existe manualmente)
+      debug:
+        msg: "ATENCION: no se encontro Hosted Zone para {{ domain_name }}. Debe crearse antes de aplicar Terraform."
+      when: domain_name not in zone_check.stdout
+
+    - name: Limpiar archivos temporales de policy
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/trust-policy.json
+        - /tmp/deploy-policy.json
