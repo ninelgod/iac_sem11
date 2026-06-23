@@ -88,6 +88,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "alb_logs" {
   rule {
     id     = "expire-old-logs"
     status = "Enabled"
+    filter {}
     expiration { days = 365 }
     abort_incomplete_multipart_upload { days_after_initiation = 7 }
   }
@@ -164,6 +165,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs" {
   rule {
     id     = "expire-old-logs"
     status = "Enabled"
+    filter {}
     expiration { days = 365 }
     abort_incomplete_multipart_upload { days_after_initiation = 7 }
   }
