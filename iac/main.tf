@@ -52,6 +52,7 @@ module "secrets" {
 module "waf" {
   source      = "./modules/waf"
   name_prefix = local.name_prefix
+  kms_key_arn = module.kms.cloudwatch_key_arn
 
   providers = {
     aws           = aws

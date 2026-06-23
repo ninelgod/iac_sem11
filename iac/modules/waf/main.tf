@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 # --- WAF for ALB (REGIONAL) ---
 
 # Web ACL regional asociado al ALB: filtra requests maliciosos antes de que lleguen a ECS.
@@ -108,10 +110,11 @@ resource "aws_wafv2_web_acl_logging_configuration" "alb" {
   }
 }
 
-# Log group donde caen los logs del WAF del ALB.
+# Log group donde caen los logs del WAF del ALB, cifrado con la KMS key de CloudWatch.
 resource "aws_cloudwatch_log_group" "waf_alb" {
   name              = "aws-waf-logs-${var.name_prefix}-alb"
   retention_in_days = 365
+  kms_key_id        = var.kms_key_arn
 }
 
 # --- WAF for CloudFront (CLOUDFRONT must be us-east-1) ---
@@ -196,4 +199,60 @@ resource "aws_wafv2_web_acl" "cloudfront" {
   }
 
   tags = { Name = "${var.name_prefix}-cf-waf" }
+}
+
+# Llave KMS dedicada al log group del WAF de CloudFront: debe vivir en us-east-1 porque el log group de WAF tiene que estar en la misma region que el Web ACL (CLOUDFRONT).
+resource "aws_kms_key" "waf_cloudfront_logs" {
+  provider                = aws.us_east_1
+  description             = "${var.name_prefix} CloudFront WAF logs encryption key (us-east-1)"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "Enable IAM User Permissions"
+        Effect    = "Allow"
+        Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" }
+        Action    = "kms:*"
+        Resource  = "*"
+      },
+      {
+        Sid       = "Allow CloudWatch Logs"
+        Effect    = "Allow"
+        Principal = { Service = "logs.us-east-1.amazonaws.com" }
+        Action = [
+          "kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*",
+          "kms:GenerateDataKey*", "kms:DescribeKey"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_kms_alias" "waf_cloudfront_logs" {
+  provider      = aws.us_east_1
+  name          = "alias/${var.name_prefix}-cf-waf-logs"
+  target_key_id = aws_kms_key.waf_cloudfront_logs.key_id
+}
+
+# Log group donde caen los logs del WAF de CloudFront, cifrado con la KMS key de arriba.
+resource "aws_cloudwatch_log_group" "waf_cloudfront" {
+  provider          = aws.us_east_1
+  name              = "aws-waf-logs-${var.name_prefix}-cf"
+  retention_in_days = 365
+  kms_key_id        = aws_kms_key.waf_cloudfront_logs.arn
+}
+
+# Manda los logs de las decisiones del WAF de CloudFront a CloudWatch, redactando el header Authorization.
+resource "aws_wafv2_web_acl_logging_configuration" "cloudfront" {
+  provider                = aws.us_east_1
+  log_destination_configs = [aws_cloudwatch_log_group.waf_cloudfront.arn]
+  resource_arn            = aws_wafv2_web_acl.cloudfront.arn
+
+  redacted_fields {
+    single_header { name = "authorization" }
+  }
 }
