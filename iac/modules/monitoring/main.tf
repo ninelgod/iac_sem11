@@ -2,6 +2,7 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 
+# Topic SNS donde llegan las alarmas de CloudWatch (4xx, 5xx, latencia del ALB).
 resource "aws_sns_topic" "alarms" {
   name              = "${var.name_prefix}-alarms"
   kms_master_key_id = var.kms_key_arn
@@ -9,6 +10,7 @@ resource "aws_sns_topic" "alarms" {
   tags = { Name = "${var.name_prefix}-alarms" }
 }
 
+# Suscribe un correo al topic de alarmas (recibe el aviso cuando una alarma se dispara).
 resource "aws_sns_topic_subscription" "email" {
   topic_arn = aws_sns_topic.alarms.arn
   protocol  = "email"
@@ -16,6 +18,7 @@ resource "aws_sns_topic_subscription" "email" {
 }
 
 
+# Log group del microservicio Usuarios.
 resource "aws_cloudwatch_log_group" "ecs_usuarios" {
   name              = "/ecs/${var.name_prefix}/usuarios"
   retention_in_days = 365
@@ -23,6 +26,7 @@ resource "aws_cloudwatch_log_group" "ecs_usuarios" {
   tags              = { Name = "${var.name_prefix}-ecs-usuarios-logs" }
 }
 
+# Log group del microservicio Pagos.
 resource "aws_cloudwatch_log_group" "ecs_pagos" {
   name              = "/ecs/${var.name_prefix}/pagos"
   retention_in_days = 365
@@ -30,6 +34,7 @@ resource "aws_cloudwatch_log_group" "ecs_pagos" {
   tags              = { Name = "${var.name_prefix}-ecs-pagos-logs" }
 }
 
+# Log group del microservicio Reportes.
 resource "aws_cloudwatch_log_group" "ecs_reportes" {
   name              = "/ecs/${var.name_prefix}/reportes"
   retention_in_days = 365
@@ -37,6 +42,7 @@ resource "aws_cloudwatch_log_group" "ecs_reportes" {
   tags              = { Name = "${var.name_prefix}-ecs-reportes-logs" }
 }
 
+# Log group de las queries de Aurora (exportadas desde el cluster).
 resource "aws_cloudwatch_log_group" "aurora" {
   name              = "/aws/rds/cluster/${var.name_prefix}/postgresql"
   retention_in_days = 365
@@ -45,6 +51,7 @@ resource "aws_cloudwatch_log_group" "aurora" {
 }
 
 
+# Bucket donde el ALB deposita sus access logs.
 resource "aws_s3_bucket" "alb_logs" {
   #checkov:skip=CKV_AWS_144:Bucket de logs de una sola region; los logs expiran a los 365 dias, no se justifica replicacion cross-region
   #checkov:skip=CKV2_AWS_62:Bucket de logs sin consumidores de eventos; nadie procesa estos logs via notificaciones S3
@@ -54,6 +61,7 @@ resource "aws_s3_bucket" "alb_logs" {
   tags = { Name = "${var.name_prefix}-alb-access-logs" }
 }
 
+# Access logs del bucket de logs del ALB — se cruzan con el bucket de logs de CloudFront (cada uno loguea al otro, no a sí mismo).
 resource "aws_s3_bucket_logging" "alb_logs" {
   bucket        = aws_s3_bucket.alb_logs.id
   target_bucket = aws_s3_bucket.cloudfront_logs.id
@@ -65,6 +73,7 @@ resource "aws_s3_bucket_versioning" "alb_logs" {
   versioning_configuration { status = "Enabled" }
 }
 
+# Cifrado del bucket de logs del ALB con la KMS key dedicada a logs.
 resource "aws_s3_bucket_server_side_encryption_configuration" "alb_logs" {
   bucket = aws_s3_bucket.alb_logs.id
   rule {
@@ -83,6 +92,7 @@ resource "aws_s3_bucket_public_access_block" "alb_logs" {
   restrict_public_buckets = true
 }
 
+# Borra los logs del ALB a los 365 días y limpia uploads multipart abandonados.
 resource "aws_s3_bucket_lifecycle_configuration" "alb_logs" {
   bucket = aws_s3_bucket.alb_logs.id
   rule {
@@ -94,8 +104,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "alb_logs" {
   }
 }
 
+# Cuenta de servicio fija que usa AWS internamente para escribir los access logs del ALB en cada región.
 data "aws_elb_service_account" "main" {}
 
+# Policy que permite específicamente a ese servicio del ALB escribir logs aquí, y bloquea cualquier acceso sin SSL.
 resource "aws_s3_bucket_policy" "alb_logs" {
   bucket = aws_s3_bucket.alb_logs.id
 
@@ -122,6 +134,7 @@ resource "aws_s3_bucket_policy" "alb_logs" {
 }
 
 
+# Bucket donde CloudFront deposita sus access logs.
 resource "aws_s3_bucket" "cloudfront_logs" {
   #checkov:skip=CKV_AWS_144:Bucket de logs de una sola region; los logs expiran a los 365 dias, no se justifica replicacion cross-region
   #checkov:skip=CKV2_AWS_62:Bucket de logs sin consumidores de eventos; nadie procesa estos logs via notificaciones S3
@@ -131,6 +144,7 @@ resource "aws_s3_bucket" "cloudfront_logs" {
   tags = { Name = "${var.name_prefix}-cloudfront-access-logs" }
 }
 
+# Access logs del bucket de logs de CloudFront — apuntan de vuelta al bucket de logs del ALB (logging cruzado).
 resource "aws_s3_bucket_logging" "cloudfront_logs" {
   bucket        = aws_s3_bucket.cloudfront_logs.id
   target_bucket = aws_s3_bucket.alb_logs.id
@@ -142,6 +156,7 @@ resource "aws_s3_bucket_versioning" "cloudfront_logs" {
   versioning_configuration { status = "Enabled" }
 }
 
+# Cifrado del bucket de logs de CloudFront con KMS.
 resource "aws_s3_bucket_server_side_encryption_configuration" "cloudfront_logs" {
   bucket = aws_s3_bucket.cloudfront_logs.id
   rule {
@@ -160,6 +175,7 @@ resource "aws_s3_bucket_public_access_block" "cloudfront_logs" {
   restrict_public_buckets = true
 }
 
+# Borra los logs de CloudFront a los 365 días y limpia uploads multipart abandonados.
 resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs" {
   bucket = aws_s3_bucket.cloudfront_logs.id
   rule {
@@ -171,6 +187,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs" {
   }
 }
 
+# Bloquea cualquier acceso sin SSL al bucket de logs de CloudFront.
 resource "aws_s3_bucket_policy" "cloudfront_logs" {
   bucket = aws_s3_bucket.cloudfront_logs.id
 

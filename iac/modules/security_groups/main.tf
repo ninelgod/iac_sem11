@@ -1,4 +1,5 @@
 # --- ALB Security Group ---
+# Controla qué tráfico puede llegar al Load Balancer: HTTPS público + HTTP solo para el redirect.
 resource "aws_security_group" "alb" {
   #checkov:skip=CKV_AWS_260:Puerto 80 requerido para el listener de redirect HTTP->HTTPS; no se sirve contenido de la app por este puerto
   #checkov:skip=CKV2_AWS_5:Atachado via output de modulo (module.security_groups.alb_sg_id) consumido por modules/alb; Checkov no resuelve referencias cross-module
@@ -34,6 +35,7 @@ resource "aws_security_group" "alb" {
 }
 
 # --- ECS Tasks Security Group ---
+# Controla el tráfico hacia/desde las tareas Fargate: solo acepta conexiones del ALB en los puertos de la app.
 resource "aws_security_group" "ecs" {
   #checkov:skip=CKV2_AWS_5:Atachado via output de modulo (module.security_groups.ecs_sg_id) consumido por modules/ecs; Checkov no resuelve referencias cross-module
   name        = "${var.name_prefix}-ecs-sg"
@@ -60,6 +62,7 @@ resource "aws_security_group" "ecs" {
 }
 
 # --- Aurora Security Group ---
+# Aísla la base de datos: por defecto no permite ningún tráfico saliente (la regla real de entrada va abajo, separada para evitar el ciclo).
 resource "aws_security_group" "aurora" {
   #checkov:skip=CKV2_AWS_5:Atachado via output de modulo (module.security_groups.aurora_sg_id) consumido por modules/aurora; Checkov no resuelve referencias cross-module
   name        = "${var.name_prefix}-aurora-sg"
@@ -80,6 +83,7 @@ resource "aws_security_group" "aurora" {
 # --- Reglas cruzadas ECS <-> Aurora ---
 # Separadas como recursos independientes para evitar el ciclo de dependencias
 # que se forma si se referencian con bloques ingress/egress inline en ambos SGs.
+# Permite que ECS salga hacia Aurora por el puerto 5432 (PostgreSQL).
 resource "aws_security_group_rule" "ecs_egress_aurora" {
   type                     = "egress"
   description              = "Aurora PostgreSQL"
@@ -90,6 +94,7 @@ resource "aws_security_group_rule" "ecs_egress_aurora" {
   source_security_group_id = aws_security_group.aurora.id
 }
 
+# Permite que Aurora reciba conexiones solo desde el Security Group de ECS, por el puerto 5432.
 resource "aws_security_group_rule" "aurora_ingress_ecs" {
   type                     = "ingress"
   description              = "PostgreSQL from ECS tasks only"

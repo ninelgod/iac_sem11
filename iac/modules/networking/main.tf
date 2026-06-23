@@ -1,5 +1,6 @@
 data "aws_caller_identity" "current" {}
 
+# La VPC principal donde vive toda la infraestructura del proyecto.
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true
@@ -10,6 +11,7 @@ resource "aws_vpc" "main" {
 
 # --- Public Subnets ---
 
+# Subnets públicas (una por AZ) donde viven el ALB y los NAT Gateways.
 resource "aws_subnet" "public" {
   count             = length(var.availability_zones)
   vpc_id            = aws_vpc.main.id
@@ -23,6 +25,7 @@ resource "aws_subnet" "public" {
 
 # --- Private Subnets (ECS) ---
 
+# Subnets privadas (una por AZ) donde corren las tareas Fargate de ECS, sin IP pública.
 resource "aws_subnet" "private" {
   count             = length(var.availability_zones)
   vpc_id            = aws_vpc.main.id
@@ -34,6 +37,7 @@ resource "aws_subnet" "private" {
 
 # --- Private DB Subnets (Aurora) ---
 
+# Subnets privadas dedicadas a la base de datos (una por AZ), aisladas incluso de las subnets de ECS.
 resource "aws_subnet" "private_db" {
   count             = length(var.availability_zones)
   vpc_id            = aws_vpc.main.id
@@ -45,6 +49,7 @@ resource "aws_subnet" "private_db" {
 
 # --- Internet Gateway ---
 
+# Puerta de salida/entrada a internet para las subnets públicas.
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
   tags   = { Name = "${var.name_prefix}-igw" }
@@ -52,12 +57,14 @@ resource "aws_internet_gateway" "main" {
 
 # --- NAT Gateways (one per AZ for HA) ---
 
+# IP elástica fija para cada NAT Gateway (una por AZ).
 resource "aws_eip" "nat" {
   count  = length(var.availability_zones)
   domain = "vpc"
   tags   = { Name = "${var.name_prefix}-nat-eip-${count.index}" }
 }
 
+# NAT Gateway por AZ: permite que las subnets privadas salgan a internet (ej. para llamar a KMS) sin recibir tráfico entrante.
 resource "aws_nat_gateway" "main" {
   count         = length(var.availability_zones)
   allocation_id = aws_eip.nat[count.index].id
@@ -69,29 +76,34 @@ resource "aws_nat_gateway" "main" {
 
 # --- Route Tables ---
 
+# Tabla de rutas para las subnets públicas.
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
   tags   = { Name = "${var.name_prefix}-rt-public" }
 }
 
+# Ruta default (0.0.0.0/0) de las subnets públicas hacia el Internet Gateway.
 resource "aws_route" "public_internet" {
   route_table_id         = aws_route_table.public.id
   destination_cidr_block = "0.0.0.0/0"
   gateway_id             = aws_internet_gateway.main.id
 }
 
+# Asocia cada subnet pública con la tabla de rutas pública.
 resource "aws_route_table_association" "public" {
   count          = length(aws_subnet.public)
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
 }
 
+# Una tabla de rutas privada por AZ (para que cada subnet privada salga por SU propio NAT Gateway).
 resource "aws_route_table" "private" {
   count  = length(var.availability_zones)
   vpc_id = aws_vpc.main.id
   tags   = { Name = "${var.name_prefix}-rt-private-${var.availability_zones[count.index]}" }
 }
 
+# Ruta default de cada subnet privada hacia su NAT Gateway correspondiente.
 resource "aws_route" "private_nat" {
   count                  = length(var.availability_zones)
   route_table_id         = aws_route_table.private[count.index].id
@@ -99,17 +111,20 @@ resource "aws_route" "private_nat" {
   nat_gateway_id         = aws_nat_gateway.main[count.index].id
 }
 
+# Asocia cada subnet privada (ECS) con su tabla de rutas privada.
 resource "aws_route_table_association" "private" {
   count          = length(var.availability_zones)
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private[count.index].id
 }
 
+# Tabla de rutas para las subnets de base de datos (sin ruta a internet — Aurora no necesita salir).
 resource "aws_route_table" "private_db" {
   vpc_id = aws_vpc.main.id
   tags   = { Name = "${var.name_prefix}-rt-private-db" }
 }
 
+# Asocia las subnets de DB con su tabla de rutas (aislada, sin salida a internet).
 resource "aws_route_table_association" "private_db" {
   count          = length(var.availability_zones)
   subnet_id      = aws_subnet.private_db[count.index].id
@@ -118,6 +133,7 @@ resource "aws_route_table_association" "private_db" {
 
 # --- VPC Endpoints ---
 
+# Security Group de los VPC Endpoints: solo acepta HTTPS desde las subnets privadas/DB.
 resource "aws_security_group" "vpc_endpoint" {
   name        = "${var.name_prefix}-vpce-sg"
   description = "Security group for VPC endpoints"
@@ -142,6 +158,7 @@ resource "aws_security_group" "vpc_endpoint" {
   tags = { Name = "${var.name_prefix}-vpce-sg" }
 }
 
+# Endpoint privado a la API de ECR (autenticación) — evita salir a internet para hablar con ECR.
 resource "aws_vpc_endpoint" "ecr_api" {
   vpc_id              = aws_vpc.main.id
   service_name        = "com.amazonaws.${data.aws_region.current.name}.ecr.api"
@@ -153,6 +170,7 @@ resource "aws_vpc_endpoint" "ecr_api" {
   tags = { Name = "${var.name_prefix}-vpce-ecr-api" }
 }
 
+# Endpoint privado al registro Docker de ECR (pull de imágenes de los contenedores).
 resource "aws_vpc_endpoint" "ecr_dkr" {
   vpc_id              = aws_vpc.main.id
   service_name        = "com.amazonaws.${data.aws_region.current.name}.ecr.dkr"
@@ -164,6 +182,7 @@ resource "aws_vpc_endpoint" "ecr_dkr" {
   tags = { Name = "${var.name_prefix}-vpce-ecr-dkr" }
 }
 
+# Endpoint privado a CloudWatch Logs (los contenedores mandan logs sin pasar por el NAT/internet).
 resource "aws_vpc_endpoint" "logs" {
   vpc_id              = aws_vpc.main.id
   service_name        = "com.amazonaws.${data.aws_region.current.name}.logs"
@@ -175,6 +194,7 @@ resource "aws_vpc_endpoint" "logs" {
   tags = { Name = "${var.name_prefix}-vpce-logs" }
 }
 
+# Endpoint privado a Secrets Manager (los servicios leen las credenciales de Aurora sin salir a internet).
 resource "aws_vpc_endpoint" "secretsmanager" {
   vpc_id              = aws_vpc.main.id
   service_name        = "com.amazonaws.${data.aws_region.current.name}.secretsmanager"
@@ -186,6 +206,7 @@ resource "aws_vpc_endpoint" "secretsmanager" {
   tags = { Name = "${var.name_prefix}-vpce-secretsmanager" }
 }
 
+# Endpoint Gateway (gratis) a S3 — usado por ECS/CloudFront para acceder a buckets sin salir a internet.
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.main.id
   service_name      = "com.amazonaws.${data.aws_region.current.name}.s3"
@@ -199,6 +220,7 @@ data "aws_region" "current" {}
 
 # --- VPC Flow Logs ---
 
+# Log group donde se guardan los Flow Logs (registro de todo el tráfico de red de la VPC).
 resource "aws_cloudwatch_log_group" "flow_logs" {
   name              = "/aws/vpc/${var.name_prefix}/flow-logs"
   retention_in_days = 365
@@ -207,6 +229,7 @@ resource "aws_cloudwatch_log_group" "flow_logs" {
   tags = { Name = "${var.name_prefix}-flow-logs" }
 }
 
+# Rol que asume el servicio de VPC Flow Logs para poder escribir en CloudWatch.
 resource "aws_iam_role" "flow_logs" {
   name = "${var.name_prefix}-vpc-flow-logs-role"
 
@@ -220,6 +243,7 @@ resource "aws_iam_role" "flow_logs" {
   })
 }
 
+# Permisos del rol de Flow Logs: solo puede escribir en su propio log group.
 resource "aws_iam_role_policy" "flow_logs" {
   name = "${var.name_prefix}-vpc-flow-logs-policy"
   role = aws_iam_role.flow_logs.id
@@ -240,6 +264,7 @@ resource "aws_iam_role_policy" "flow_logs" {
   })
 }
 
+# Activa el registro de Flow Logs (todo el tráfico, ACCEPT y REJECT) para toda la VPC.
 resource "aws_flow_log" "main" {
   iam_role_arn    = aws_iam_role.flow_logs.arn
   log_destination = aws_cloudwatch_log_group.flow_logs.arn
@@ -249,6 +274,7 @@ resource "aws_flow_log" "main" {
   tags = { Name = "${var.name_prefix}-flow-log" }
 }
 
+# Bloquea el Security Group "default" que AWS crea automáticamente con la VPC (sin reglas = no permite ningún tráfico).
 resource "aws_default_security_group" "default" {
   vpc_id = aws_vpc.main.id
   tags   = { Name = "${var.name_prefix}-default-sg-lockdown" }

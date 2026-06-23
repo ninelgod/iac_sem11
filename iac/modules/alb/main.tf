@@ -1,3 +1,4 @@
+# El Application Load Balancer público: punto de entrada para el tráfico dinámico/API de los microservicios.
 resource "aws_lb" "main" {
   #checkov:skip=CKV2_AWS_76:El WAFv2 ACL asociado (modules/waf) ya incluye AWSManagedRulesKnownBadInputsRuleSet con cobertura Log4j; Checkov no resuelve la asociacion cross-module
   name               = "${var.name_prefix}-alb"
@@ -19,6 +20,7 @@ resource "aws_lb" "main" {
   tags = { Name = "${var.name_prefix}-alb" }
 }
 
+# Conecta el WAF (modules/waf) con este ALB para que filtre el tráfico antes de llegar a los listeners.
 resource "aws_wafv2_web_acl_association" "alb" {
   resource_arn = aws_lb.main.arn
   web_acl_arn  = var.waf_acl_arn
@@ -26,6 +28,7 @@ resource "aws_wafv2_web_acl_association" "alb" {
 
 # --- HTTP → HTTPS redirect ---
 
+# Listener en el puerto 80 que solo redirige a HTTPS (301) — nunca sirve contenido por HTTP.
 resource "aws_lb_listener" "http_redirect" {
   load_balancer_arn = aws_lb.main.arn
   port              = 80
@@ -43,6 +46,7 @@ resource "aws_lb_listener" "http_redirect" {
 
 # --- HTTPS Listener ---
 
+# Listener principal en el puerto 443 (TLS 1.3). Por defecto responde 404; el ruteo real lo hacen las listener rules de abajo.
 resource "aws_lb_listener" "https" {
   load_balancer_arn = aws_lb.main.arn
   port              = 443
@@ -62,6 +66,7 @@ resource "aws_lb_listener" "https" {
 
 # --- Target Groups ---
 
+# Target Group del microservicio Usuarios (registra las tareas Fargate por IP, healthcheck en /health).
 resource "aws_lb_target_group" "usuarios" {
   #checkov:skip=CKV_AWS_378:Trafico de backend confinado a subnets privadas y solo alcanzable desde la SG del ALB; el edge publico ya fuerza HTTPS/TLS1.3 en el listener
   name        = "${var.name_prefix}-usuarios-tg"
@@ -83,6 +88,7 @@ resource "aws_lb_target_group" "usuarios" {
   tags = { Name = "${var.name_prefix}-usuarios-tg" }
 }
 
+# Target Group del microservicio Pagos.
 resource "aws_lb_target_group" "pagos" {
   #checkov:skip=CKV_AWS_378:Trafico de backend confinado a subnets privadas y solo alcanzable desde la SG del ALB; el edge publico ya fuerza HTTPS/TLS1.3 en el listener
   name        = "${var.name_prefix}-pagos-tg"
@@ -104,6 +110,7 @@ resource "aws_lb_target_group" "pagos" {
   tags = { Name = "${var.name_prefix}-pagos-tg" }
 }
 
+# Target Group del microservicio Reportes.
 resource "aws_lb_target_group" "reportes" {
   #checkov:skip=CKV_AWS_378:Trafico de backend confinado a subnets privadas y solo alcanzable desde la SG del ALB; el edge publico ya fuerza HTTPS/TLS1.3 en el listener
   name        = "${var.name_prefix}-reportes-tg"
@@ -127,6 +134,7 @@ resource "aws_lb_target_group" "reportes" {
 
 # --- Path-based Routing Rules ---
 
+# Si la URL empieza con /api/usuarios/ o /api/auth/, el ALB manda el tráfico al Target Group de Usuarios.
 resource "aws_lb_listener_rule" "usuarios" {
   listener_arn = aws_lb_listener.https.arn
   priority     = 100
@@ -141,6 +149,7 @@ resource "aws_lb_listener_rule" "usuarios" {
   }
 }
 
+# Si la URL empieza con /api/pagos/, el ALB manda el tráfico al Target Group de Pagos.
 resource "aws_lb_listener_rule" "pagos" {
   listener_arn = aws_lb_listener.https.arn
   priority     = 200
@@ -155,6 +164,7 @@ resource "aws_lb_listener_rule" "pagos" {
   }
 }
 
+# Si la URL empieza con /api/reportes/, el ALB manda el tráfico al Target Group de Reportes.
 resource "aws_lb_listener_rule" "reportes" {
   listener_arn = aws_lb_listener.https.arn
   priority     = 300

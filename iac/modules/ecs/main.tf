@@ -10,6 +10,7 @@ locals {
 
 # --- ECS Cluster ---
 
+# Cluster lógico de ECS donde corren los 3 microservicios como tareas Fargate.
 resource "aws_ecs_cluster" "main" {
   name = "${var.name_prefix}-cluster"
 
@@ -21,6 +22,7 @@ resource "aws_ecs_cluster" "main" {
   tags = { Name = "${var.name_prefix}-cluster" }
 }
 
+# Define qué motores de cómputo puede usar el cluster (Fargate normal y Fargate Spot, más barato).
 resource "aws_ecs_cluster_capacity_providers" "main" {
   cluster_name       = aws_ecs_cluster.main.name
   capacity_providers = ["FARGATE", "FARGATE_SPOT"]
@@ -34,6 +36,7 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
 
 # --- Service Connect Namespace ---
 
+# Namespace de descubrimiento de servicios para que usuarios/pagos/reportes se hablen entre sí por nombre (ECS Service Connect).
 resource "aws_service_discovery_http_namespace" "main" {
   name        = "${var.name_prefix}-namespace"
   description = "ECS Service Connect namespace for ${var.name_prefix}"
@@ -42,6 +45,7 @@ resource "aws_service_discovery_http_namespace" "main" {
 
 # --- IAM Roles ---
 
+# Rol que usa el AGENTE de ECS para arrancar el contenedor (pull de imagen, logs, secrets) - no es el código de la app.
 resource "aws_iam_role" "execution" {
   name = "${var.name_prefix}-ecs-execution-role"
 
@@ -55,11 +59,13 @@ resource "aws_iam_role" "execution" {
   })
 }
 
+# Política administrada estándar de AWS para que el rol de ejecución pueda hacer pull de ECR y mandar logs.
 resource "aws_iam_role_policy_attachment" "execution_basic" {
   role       = aws_iam_role.execution.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+# Permiso adicional para que el rol de ejecución pueda leer el secreto de Aurora y descifrarlo con KMS (inyección de credenciales al contenedor).
 resource "aws_iam_role_policy" "execution_secrets" {
   name = "${var.name_prefix}-execution-secrets"
   role = aws_iam_role.execution.id
@@ -81,6 +87,7 @@ resource "aws_iam_role_policy" "execution_secrets" {
   })
 }
 
+# Rol que usa el CÓDIGO de la aplicación dentro del contenedor (lo que el microservicio asume en runtime).
 resource "aws_iam_role" "task" {
   name = "${var.name_prefix}-ecs-task-role"
 
@@ -99,6 +106,7 @@ resource "aws_iam_role" "task" {
   })
 }
 
+# Permisos que la app necesita en runtime: escribir logs, leer el secreto de Aurora, y usar ECS Exec (debug por SSM).
 resource "aws_iam_role_policy" "task" {
   name = "${var.name_prefix}-ecs-task-policy"
   role = aws_iam_role.task.id
@@ -128,6 +136,7 @@ resource "aws_iam_role_policy" "task" {
 
 # --- Task Definitions ---
 
+# Una Task Definition por microservicio (usuarios/pagos/reportes): imagen, CPU/RAM, variables de entorno y healthcheck.
 resource "aws_ecs_task_definition" "service" {
   for_each = local.services
 
@@ -199,6 +208,7 @@ resource "aws_ecs_task_definition" "service" {
 
 # --- ECS Services ---
 
+# El Service mantiene corriendo N tareas de cada microservicio, las registra en su Target Group del ALB y en Service Connect.
 resource "aws_ecs_service" "service" {
   for_each = local.services
 
@@ -265,6 +275,7 @@ resource "aws_ecs_service" "service" {
 
 # --- Auto Scaling ---
 
+# Define el rango de tareas (2 a 4) que Application Auto Scaling puede manejar por servicio.
 resource "aws_appautoscaling_target" "service" {
   for_each = local.services
 
@@ -275,6 +286,7 @@ resource "aws_appautoscaling_target" "service" {
   service_namespace  = "ecs"
 }
 
+# Política de escalado: si el CPU promedio del servicio supera 70%, agrega tareas (target tracking).
 resource "aws_appautoscaling_policy" "cpu" {
   for_each = local.services
 

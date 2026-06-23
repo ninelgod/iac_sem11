@@ -1,3 +1,4 @@
+# Agrupa las 2 subnets privadas de base de datos (una por AZ) — Aurora exige al menos 2 AZ en el subnet group.
 resource "aws_db_subnet_group" "main" {
   name        = "${var.name_prefix}-db-subnet-group"
   description = "Aurora DB subnet group"
@@ -6,6 +7,7 @@ resource "aws_db_subnet_group" "main" {
   tags = { Name = "${var.name_prefix}-db-subnet-group" }
 }
 
+# Parámetros custom del motor PostgreSQL: log de todas las queries, log de queries lentas (>1s) y SSL obligatorio.
 resource "aws_rds_cluster_parameter_group" "main" {
   name        = "${var.name_prefix}-cluster-params"
   family      = "aurora-postgresql16"
@@ -30,6 +32,7 @@ resource "aws_rds_cluster_parameter_group" "main" {
   tags = { Name = "${var.name_prefix}-cluster-params" }
 }
 
+# El cluster de Aurora Serverless v2 (PostgreSQL): cifrado con KMS, backups de 7 días, snapshot final y deletion protection.
 resource "aws_rds_cluster" "main" {
   #checkov:skip=CKV2_AWS_8:El cluster ya tiene backups nativos automaticos (backup_retention_period=7, snapshot final, deletion_protection); un AWS Backup plan seria redundante
   cluster_identifier = "${var.name_prefix}-aurora-cluster"
@@ -71,6 +74,7 @@ resource "aws_rds_cluster" "main" {
   tags = { Name = "${var.name_prefix}-aurora-cluster" }
 }
 
+# Instancia primaria de Aurora, en la AZ A (us-east-2a) — la que normalmente atiende las queries.
 resource "aws_rds_cluster_instance" "primary" {
   identifier           = "${var.name_prefix}-aurora-primary"
   cluster_identifier   = aws_rds_cluster.main.id
@@ -88,6 +92,7 @@ resource "aws_rds_cluster_instance" "primary" {
   tags = { Name = "${var.name_prefix}-aurora-primary" }
 }
 
+# Instancia secundaria (reader/failover), en la AZ B (us-east-2b) — es el "Multi-AZ" que pidió el ingeniero, listo para tomar el rol de primary si la AZ A falla.
 resource "aws_rds_cluster_instance" "secondary" {
   identifier           = "${var.name_prefix}-aurora-secondary"
   cluster_identifier   = aws_rds_cluster.main.id
@@ -106,6 +111,7 @@ resource "aws_rds_cluster_instance" "secondary" {
 }
 
 
+# Rol que usa RDS para escribir las métricas de Enhanced Monitoring (CPU, I/O, memoria al detalle) a CloudWatch.
 resource "aws_iam_role" "rds_monitoring" {
   name = "${var.name_prefix}-rds-monitoring-role"
 
@@ -119,6 +125,7 @@ resource "aws_iam_role" "rds_monitoring" {
   })
 }
 
+# Política administrada de AWS que habilita el Enhanced Monitoring para el rol de arriba.
 resource "aws_iam_role_policy_attachment" "rds_monitoring" {
   role       = aws_iam_role.rds_monitoring.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"

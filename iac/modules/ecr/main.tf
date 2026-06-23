@@ -1,3 +1,4 @@
+# Un repositorio ECR por microservicio (usuarios/pagos/reportes) donde se guardan sus imágenes Docker.
 resource "aws_ecr_repository" "service" {
   for_each = toset(var.services)
 
@@ -16,6 +17,7 @@ resource "aws_ecr_repository" "service" {
   tags = { Name = "${var.name_prefix}-${each.key}" }
 }
 
+# Limpieza automática: conserva solo las últimas 10 imágenes "prod-" y borra las sin tag después de 7 días.
 resource "aws_ecr_lifecycle_policy" "service" {
   for_each   = aws_ecr_repository.service
   repository = each.value.name
@@ -48,6 +50,7 @@ resource "aws_ecr_lifecycle_policy" "service" {
   })
 }
 
+# Política del repositorio: bloquea cualquier pull/push que no venga por HTTPS.
 resource "aws_ecr_repository_policy" "service" {
   for_each   = aws_ecr_repository.service
   repository = each.value.name

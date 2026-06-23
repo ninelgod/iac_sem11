@@ -1,5 +1,6 @@
 # --- WAF for ALB (REGIONAL) ---
 
+# Web ACL regional asociado al ALB: filtra requests maliciosos antes de que lleguen a ECS.
 resource "aws_wafv2_web_acl" "alb" {
   name  = "${var.name_prefix}-alb-waf"
   scope = "REGIONAL"
@@ -8,6 +9,7 @@ resource "aws_wafv2_web_acl" "alb" {
     allow {}
   }
 
+  # Regla administrada de AWS: bloquea ataques web comunes (OWASP Top 10 genérico).
   rule {
     name     = "AWSManagedRulesCommonRuleSet"
     priority = 1
@@ -27,6 +29,7 @@ resource "aws_wafv2_web_acl" "alb" {
     }
   }
 
+  # Regla administrada: bloquea patrones de entradas maliciosas conocidas (incluye cobertura para Log4j/Log4Shell).
   rule {
     name     = "AWSManagedRulesKnownBadInputsRuleSet"
     priority = 2
@@ -46,6 +49,7 @@ resource "aws_wafv2_web_acl" "alb" {
     }
   }
 
+  # Regla administrada: bloquea intentos de inyección SQL.
   rule {
     name     = "AWSManagedRulesSQLiRuleSet"
     priority = 3
@@ -65,6 +69,7 @@ resource "aws_wafv2_web_acl" "alb" {
     }
   }
 
+  # Regla propia: bloquea una IP si supera 2000 requests en la ventana de evaluación (anti fuerza bruta/DoS básico).
   rule {
     name     = "RateLimitRule"
     priority = 4
@@ -93,6 +98,7 @@ resource "aws_wafv2_web_acl" "alb" {
   tags = { Name = "${var.name_prefix}-alb-waf" }
 }
 
+# Manda los logs de las decisiones del WAF (qué bloqueó, qué dejó pasar) a CloudWatch, redactando el header Authorization.
 resource "aws_wafv2_web_acl_logging_configuration" "alb" {
   log_destination_configs = [aws_cloudwatch_log_group.waf_alb.arn]
   resource_arn            = aws_wafv2_web_acl.alb.arn
@@ -102,6 +108,7 @@ resource "aws_wafv2_web_acl_logging_configuration" "alb" {
   }
 }
 
+# Log group donde caen los logs del WAF del ALB.
 resource "aws_cloudwatch_log_group" "waf_alb" {
   name              = "aws-waf-logs-${var.name_prefix}-alb"
   retention_in_days = 365
@@ -112,6 +119,7 @@ resource "aws_cloudwatch_log_group" "waf_alb" {
 # Here we output a placeholder ARN; teams should deploy waf/cloudfront in a us-east-1 stack.
 # See: modules/waf/cloudfront_waf/main.tf for the us-east-1 WAF resource.
 
+# Web ACL global (scope CLOUDFRONT) asociado a la distribución de CloudFront. AWS exige que viva en us-east-1 sí o sí.
 resource "aws_wafv2_web_acl" "cloudfront" {
   provider = aws.us_east_1
   name     = "${var.name_prefix}-cf-waf"
@@ -121,6 +129,7 @@ resource "aws_wafv2_web_acl" "cloudfront" {
     allow {}
   }
 
+  # Misma regla de ataques web comunes, aplicada al tráfico que entra por CloudFront.
   rule {
     name     = "AWSManagedRulesCommonRuleSet"
     priority = 1
@@ -140,6 +149,7 @@ resource "aws_wafv2_web_acl" "cloudfront" {
     }
   }
 
+  # Misma regla de inputs maliciosos conocidos (cobertura Log4j) pero del lado de CloudFront.
   rule {
     name     = "AWSManagedRulesKnownBadInputsRuleSet"
     priority = 2
@@ -159,6 +169,7 @@ resource "aws_wafv2_web_acl" "cloudfront" {
     }
   }
 
+  # Rate limiting propio para el tráfico del frontend (límite más alto que el del ALB porque es contenido estático cacheado).
   rule {
     name     = "RateLimitCF"
     priority = 3

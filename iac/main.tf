@@ -2,12 +2,14 @@ locals {
   name_prefix = "${var.project_name}-${var.environment}"
 }
 
+# Llaves KMS usadas por todos los demás módulos para cifrar logs, RDS, secrets, ECR y S3.
 module "kms" {
   source      = "./modules/kms"
   name_prefix = local.name_prefix
   aws_region  = var.aws_region
 }
 
+# VPC, subnets (públicas/privadas/DB), NAT/IGW, VPC Endpoints y Flow Logs.
 module "networking" {
   source                  = "./modules/networking"
   name_prefix             = local.name_prefix
@@ -19,6 +21,7 @@ module "networking" {
   kms_key_id              = module.kms.cloudwatch_key_arn
 }
 
+# Security Groups de ALB, ECS y Aurora.
 module "security_groups" {
   source      = "./modules/security_groups"
   name_prefix = local.name_prefix
@@ -26,6 +29,7 @@ module "security_groups" {
   vpc_cidr    = var.vpc_cidr
 }
 
+# Repositorios ECR para las 3 imágenes Docker de los microservicios.
 module "ecr" {
   source      = "./modules/ecr"
   name_prefix = local.name_prefix
@@ -33,6 +37,7 @@ module "ecr" {
   services    = ["usuarios", "pagos", "reportes"]
 }
 
+# Secrets Manager (credenciales de Aurora) + Lambda de rotación automática.
 module "secrets" {
   source              = "./modules/secrets"
   name_prefix         = local.name_prefix
@@ -43,6 +48,7 @@ module "secrets" {
   subnet_ids          = module.networking.private_subnet_ids
 }
 
+# Web ACLs de WAF para el ALB (regional) y para CloudFront (global, en us-east-1).
 module "waf" {
   source      = "./modules/waf"
   name_prefix = local.name_prefix
@@ -53,6 +59,7 @@ module "waf" {
   }
 }
 
+# Application Load Balancer + listeners + target groups + reglas de ruteo por path.
 module "alb" {
   source            = "./modules/alb"
   name_prefix       = local.name_prefix
@@ -64,11 +71,13 @@ module "alb" {
   logs_bucket       = module.monitoring.alb_logs_bucket
 }
 
+# User Pool de Cognito para la autenticación de usuarios.
 module "cognito" {
   source      = "./modules/cognito"
   name_prefix = local.name_prefix
 }
 
+# Cluster Aurora Serverless v2 (PostgreSQL) Multi-AZ.
 module "aurora" {
   source               = "./modules/aurora"
   name_prefix          = local.name_prefix
@@ -81,6 +90,7 @@ module "aurora" {
   cloudwatch_log_group = module.monitoring.aurora_log_group_name
 }
 
+# Cluster ECS Fargate con las 3 task definitions/services y su auto scaling.
 module "ecs" {
   source             = "./modules/ecs"
   name_prefix        = local.name_prefix
@@ -97,6 +107,7 @@ module "ecs" {
   db_name               = var.db_name
 }
 
+# Bucket S3 estático + distribución CloudFront + registro DNS del dominio público.
 module "frontend" {
   source                     = "./modules/frontend"
   name_prefix                = local.name_prefix
@@ -107,6 +118,7 @@ module "frontend" {
   kms_key_arn                = module.kms.s3_key_arn
 }
 
+# SNS de alarmas + log groups de los 3 microservicios y de Aurora + buckets de logs (ALB/CloudFront).
 module "monitoring" {
   source      = "./modules/monitoring"
   name_prefix = local.name_prefix
@@ -116,6 +128,7 @@ module "monitoring" {
 
 # --- CloudWatch Alarms (standalone para evitar ciclo alb <-> monitoring) ---
 
+# Alarma: dispara si la tasa de errores 5xx del ALB supera el 1%.
 resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
   alarm_name          = "${local.name_prefix}-alb-5xxErrorRate"
   alarm_description   = "ALB 5xx error rate exceeds 1%"
@@ -132,6 +145,7 @@ resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
   ok_actions          = [module.monitoring.alarm_topic_arn]
 }
 
+# Alarma: dispara si la tasa de errores 4xx del ALB supera el 5%.
 resource "aws_cloudwatch_metric_alarm" "alb_4xx" {
   alarm_name          = "${local.name_prefix}-alb-4xxErrorRate"
   alarm_description   = "ALB 4xx error rate exceeds 5%"
@@ -148,6 +162,7 @@ resource "aws_cloudwatch_metric_alarm" "alb_4xx" {
   ok_actions          = [module.monitoring.alarm_topic_arn]
 }
 
+# Alarma: dispara si el tiempo de respuesta p95 del ALB supera 2 segundos (OriginLatency del diagrama).
 resource "aws_cloudwatch_metric_alarm" "alb_latency" {
   alarm_name          = "${local.name_prefix}-alb-OriginLatency"
   alarm_description   = "ALB target response time (p95) exceeds 2 seconds"

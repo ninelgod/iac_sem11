@@ -4,6 +4,7 @@ locals {
   account_id = data.aws_caller_identity.current.account_id
 }
 
+# Llave KMS dedicada a cifrar los CloudWatch Log Groups de todo el proyecto.
 resource "aws_kms_key" "cloudwatch" {
   description             = "${var.name_prefix} CloudWatch Logs encryption key"
   deletion_window_in_days = 30
@@ -35,11 +36,13 @@ resource "aws_kms_key" "cloudwatch" {
   })
 }
 
+# Alias legible para la llave de CloudWatch (evita usar el key_id crudo en otros módulos).
 resource "aws_kms_alias" "cloudwatch" {
   name          = "alias/${var.name_prefix}-cloudwatch"
   target_key_id = aws_kms_key.cloudwatch.key_id
 }
 
+# Llave KMS para cifrar el storage y los snapshots de Aurora (RDS).
 resource "aws_kms_key" "rds" {
   description             = "${var.name_prefix} Aurora RDS encryption key"
   deletion_window_in_days = 30
@@ -62,6 +65,7 @@ resource "aws_kms_alias" "rds" {
   target_key_id = aws_kms_key.rds.key_id
 }
 
+# Llave KMS para cifrar los secretos en Secrets Manager (credenciales de Aurora).
 resource "aws_kms_key" "secrets" {
   description             = "${var.name_prefix} Secrets Manager encryption key"
   deletion_window_in_days = 30
@@ -96,6 +100,7 @@ resource "aws_kms_alias" "secrets" {
   target_key_id = aws_kms_key.secrets.key_id
 }
 
+# Llave KMS para cifrar las imágenes Docker almacenadas en ECR.
 resource "aws_kms_key" "ecr" {
   description             = "${var.name_prefix} ECR encryption key"
   deletion_window_in_days = 30
@@ -118,6 +123,7 @@ resource "aws_kms_alias" "ecr" {
   target_key_id = aws_kms_key.ecr.key_id
 }
 
+# Llave KMS para cifrar los buckets S3 (frontend estático), usada también por CloudFront.
 resource "aws_kms_key" "s3" {
   description             = "${var.name_prefix} S3 encryption key"
   deletion_window_in_days = 30
@@ -151,6 +157,7 @@ resource "aws_kms_alias" "s3" {
   target_key_id = aws_kms_key.s3.key_id
 }
 
+# Llave KMS dedicada a los buckets de logs (ALB access logs / CloudFront access logs).
 resource "aws_kms_key" "alb_logs" {
   description             = "${var.name_prefix} ALB logs S3 encryption key"
   deletion_window_in_days = 30

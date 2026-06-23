@@ -1,5 +1,6 @@
 data "aws_region" "current" {}
 
+# User Pool de Cognito: aquí se registran y autentican los usuarios de la app (login con email).
 resource "aws_cognito_user_pool" "main" {
   name = "${var.name_prefix}-user-pool"
 
@@ -57,6 +58,7 @@ resource "aws_cognito_user_pool" "main" {
   tags = { Name = "${var.name_prefix}-user-pool" }
 }
 
+# Cliente de aplicación (API) que usan los microservicios para llamar a InitiateAuth y obtener el JWT del usuario.
 resource "aws_cognito_user_pool_client" "api" {
   name         = "${var.name_prefix}-api-client"
   user_pool_id = aws_cognito_user_pool.main.id
@@ -83,6 +85,7 @@ resource "aws_cognito_user_pool_client" "api" {
   }
 }
 
+# Dominio de Cognito (necesario para exponer el endpoint JWKS que los microservicios usan para validar el JWT).
 resource "aws_cognito_user_pool_domain" "main" {
   domain       = var.name_prefix
   user_pool_id = aws_cognito_user_pool.main.id

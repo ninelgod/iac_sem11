@@ -1,15 +1,18 @@
+# Empaqueta el código Python de la Lambda de rotación en un .zip (Terraform lo sube tal cual a Lambda).
 data "archive_file" "rotation_lambda" {
   type        = "zip"
   source_file = "${path.module}/rotation.py"
   output_path = "${path.module}/rotation.zip"
 }
 
+# Genera la contraseña inicial del usuario master de Aurora (no queda hardcodeada en ningún lado).
 resource "random_password" "db_master" {
   length           = 32
   special          = true
   override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
+# Secreto en Secrets Manager donde se guardan las credenciales de Aurora.
 resource "aws_secretsmanager_secret" "db" {
   name                    = "${var.name_prefix}/aurora/db-credentials"
   description             = "Aurora PostgreSQL master credentials"
@@ -19,6 +22,7 @@ resource "aws_secretsmanager_secret" "db" {
   tags = { Name = "${var.name_prefix}-db-secret" }
 }
 
+# Primera versión del secreto: usuario, password generada, nombre de BD y engine.
 resource "aws_secretsmanager_secret_version" "db" {
   secret_id = aws_secretsmanager_secret.db.id
 
@@ -30,6 +34,7 @@ resource "aws_secretsmanager_secret_version" "db" {
   })
 }
 
+# Activa la rotación automática del secreto cada 30 días, invocando la Lambda de abajo.
 resource "aws_secretsmanager_secret_rotation" "db" {
   secret_id           = aws_secretsmanager_secret.db.id
   rotation_lambda_arn = aws_lambda_function.rotate_secret.arn
@@ -46,6 +51,7 @@ resource "aws_secretsmanager_secret_rotation" "db" {
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
+# Rol que asume la Lambda de rotación de secretos.
 resource "aws_iam_role" "rotation_lambda" {
   name = "${var.name_prefix}-secret-rotation-role"
 
@@ -59,16 +65,19 @@ resource "aws_iam_role" "rotation_lambda" {
   })
 }
 
+# Política administrada básica de Lambda: permite escribir logs en CloudWatch.
 resource "aws_iam_role_policy_attachment" "rotation_lambda_basic" {
   role       = aws_iam_role.rotation_lambda.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+# Política administrada que permite a Lambda crear/gestionar las interfaces de red (ENIs) necesarias para correr dentro de la VPC.
 resource "aws_iam_role_policy_attachment" "rotation_lambda_vpc" {
   role       = aws_iam_role.rotation_lambda.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
+# Security Group de la Lambda: solo necesita salida HTTPS (hacia Secrets Manager/KMS vía VPC endpoints o NAT).
 resource "aws_security_group" "rotation_lambda" {
   name        = "${var.name_prefix}-secret-rotation-lambda-sg"
   description = "Security group for the Secrets Manager rotation Lambda"
@@ -85,6 +94,7 @@ resource "aws_security_group" "rotation_lambda" {
   tags = { Name = "${var.name_prefix}-secret-rotation-lambda-sg" }
 }
 
+# Cola SQS donde caen los eventos que la Lambda no pudo procesar (Dead Letter Queue), para no perder fallos silenciosamente.
 resource "aws_sqs_queue" "rotation_dlq" {
   name                      = "${var.name_prefix}-secret-rotation-dlq"
   kms_master_key_id         = var.kms_key_arn
@@ -93,6 +103,7 @@ resource "aws_sqs_queue" "rotation_dlq" {
   tags = { Name = "${var.name_prefix}-secret-rotation-dlq" }
 }
 
+# Permiso para que la Lambda pueda mandar mensajes a su propia DLQ cuando falla.
 resource "aws_iam_role_policy" "rotation_lambda_dlq" {
   name = "${var.name_prefix}-secret-rotation-dlq-policy"
   role = aws_iam_role.rotation_lambda.id
@@ -107,6 +118,7 @@ resource "aws_iam_role_policy" "rotation_lambda_dlq" {
   })
 }
 
+# Perfil de firma de AWS Signer: certifica que el código de la Lambda viene de una fuente confiable.
 resource "aws_signer_signing_profile" "rotation_lambda" {
   platform_id = "AWSLambda-SHA384-ECDSA"
   name_prefix = "secret_rotation_"
@@ -114,6 +126,7 @@ resource "aws_signer_signing_profile" "rotation_lambda" {
   tags = { Name = "${var.name_prefix}-secret-rotation-signing-profile" }
 }
 
+# Exige que el código desplegado a la Lambda esté firmado por el perfil de arriba (bloquea despliegues no autorizados).
 resource "aws_lambda_code_signing_config" "rotation_lambda" {
   allowed_publishers {
     signing_profile_version_arns = [aws_signer_signing_profile.rotation_lambda.version_arn]
@@ -124,6 +137,7 @@ resource "aws_lambda_code_signing_config" "rotation_lambda" {
   }
 }
 
+# Permisos en runtime de la Lambda: leer/actualizar el secreto de Aurora y usar la KMS key para descifrarlo.
 resource "aws_iam_role_policy" "rotation_lambda" {
   name = "${var.name_prefix}-secret-rotation-policy"
   role = aws_iam_role.rotation_lambda.id
@@ -146,12 +160,14 @@ resource "aws_iam_role_policy" "rotation_lambda" {
   })
 }
 
+# Log group de la Lambda de rotación.
 resource "aws_cloudwatch_log_group" "rotation_lambda" {
   name              = "/aws/lambda/${var.name_prefix}-secret-rotation"
   retention_in_days = 365
   kms_key_id        = var.kms_key_arn
 }
 
+# Lambda que ejecuta la rotación del secreto cada 30 días: corre dentro de la VPC, con DLQ, code signing y env vars cifradas con KMS.
 resource "aws_lambda_function" "rotate_secret" {
   function_name = "${var.name_prefix}-secret-rotation"
   role          = aws_iam_role.rotation_lambda.arn
@@ -187,6 +203,7 @@ resource "aws_lambda_function" "rotate_secret" {
   depends_on = [aws_cloudwatch_log_group.rotation_lambda, aws_iam_role_policy_attachment.rotation_lambda_vpc]
 }
 
+# Autoriza a Secrets Manager (y solo para ESTE secreto puntual) a invocar la Lambda cuando toca rotar.
 resource "aws_lambda_permission" "secrets_manager" {
   statement_id  = "AllowSecretsManagerInvocation"
   action        = "lambda:InvokeFunction"

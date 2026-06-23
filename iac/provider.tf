@@ -21,6 +21,7 @@ terraform {
   }
 }
 
+# Provider principal: todo lo que vive en us-east-2 (la región de despliegue del proyecto).
 provider "aws" {
   region = var.aws_region
 
@@ -34,6 +35,7 @@ provider "aws" {
 }
 
 # Required for CloudFront WAF (must be us-east-1)
+# Provider alias: AWS exige que el WAF de CloudFront (scope CLOUDFRONT) se cree específicamente en us-east-1.
 provider "aws" {
   alias  = "us_east_1"
   region = "us-east-1"

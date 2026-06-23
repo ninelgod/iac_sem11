@@ -1,6 +1,6 @@
 data "aws_caller_identity" "current" {}
 
-
+# Bucket S3 que guarda los archivos estáticos del frontend (el "gestorpagosg2-web" del diagrama).
 resource "aws_s3_bucket" "frontend" {
   #checkov:skip=CKV_AWS_144:Bucket de assets estaticos servido via CloudFront global; una sola region no justifica replicacion cross-region
   #checkov:skip=CKV2_AWS_62:Bucket de assets estaticos sin consumidores de eventos; no hay integracion downstream que necesite notificaciones S3
@@ -10,11 +10,13 @@ resource "aws_s3_bucket" "frontend" {
   tags = { Name = "${var.name_prefix}-web" }
 }
 
+# Versionado activado — permite recuperar versiones anteriores de los archivos si algo se sobrescribe mal.
 resource "aws_s3_bucket_versioning" "frontend" {
   bucket = aws_s3_bucket.frontend.id
   versioning_configuration { status = "Enabled" }
 }
 
+# Cifrado del bucket con la KMS key del módulo kms (no AES256 genérico).
 resource "aws_s3_bucket_server_side_encryption_configuration" "frontend" {
   bucket = aws_s3_bucket.frontend.id
   rule {
@@ -26,6 +28,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "frontend" {
   }
 }
 
+# Bloquea cualquier acceso público directo al bucket — solo CloudFront puede leerlo (vía OAC).
 resource "aws_s3_bucket_public_access_block" "frontend" {
   bucket                  = aws_s3_bucket.frontend.id
   block_public_acls       = true
@@ -34,12 +37,14 @@ resource "aws_s3_bucket_public_access_block" "frontend" {
   restrict_public_buckets = true
 }
 
+# Manda los access logs de este bucket al bucket de logs de monitoring.
 resource "aws_s3_bucket_logging" "frontend" {
   bucket        = aws_s3_bucket.frontend.id
   target_bucket = var.logs_bucket
   target_prefix = "s3-frontend/"
 }
 
+# Borra versiones viejas a los 90 días y limpia uploads multipart abandonados a los 7 días.
 resource "aws_s3_bucket_lifecycle_configuration" "frontend" {
   bucket = aws_s3_bucket.frontend.id
   rule {
@@ -52,6 +57,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "frontend" {
 }
 
 
+# Origin Access Control: es lo que permite que SOLO CloudFront (y nadie más) pueda firmar requests hacia el bucket S3.
 resource "aws_cloudfront_origin_access_control" "frontend" {
   name                              = "${var.name_prefix}-oac"
   description                       = "OAC for ${var.name_prefix} frontend S3"
@@ -61,6 +67,7 @@ resource "aws_cloudfront_origin_access_control" "frontend" {
 }
 
 
+# Policy del bucket: permite leer objetos SOLO a la distribución de CloudFront (por su ARN) y deniega cualquier acceso sin SSL.
 resource "aws_s3_bucket_policy" "frontend" {
   bucket = aws_s3_bucket.frontend.id
 
@@ -94,6 +101,7 @@ resource "aws_s3_bucket_policy" "frontend" {
 }
 
 
+# Headers de seguridad que CloudFront agrega a cada respuesta (HSTS, anti-clickjacking, anti-MIME-sniffing, etc.).
 resource "aws_cloudfront_response_headers_policy" "security_headers" {
   name = "${var.name_prefix}-security-headers"
 
@@ -123,6 +131,7 @@ resource "aws_cloudfront_response_headers_policy" "security_headers" {
   }
 }
 
+# La distribución de CloudFront: CDN global que sirve el frontend estático con HTTPS, WAF y los headers de seguridad de arriba.
 resource "aws_cloudfront_distribution" "frontend" {
   #checkov:skip=CKV_AWS_310:Origen unico S3 sirviendo contenido estatico; un origin_group de failover duplicado contra el mismo bucket no aporta redundancia real
   #checkov:skip=CKV2_AWS_47:El WAFv2 ACL asociado (modules/waf) ya incluye AWSManagedRulesKnownBadInputsRuleSet con cobertura Log4j; Checkov no resuelve la asociacion cross-module
@@ -158,6 +167,7 @@ resource "aws_cloudfront_distribution" "frontend" {
     max_ttl     = 31536000
   }
 
+  # Para una SPA: cualquier 403/404 de S3 se reescribe a index.html (deja que el router de React/Vue/etc. decida la ruta).
   custom_error_response {
     error_code            = 403
     response_code         = 200
@@ -184,6 +194,7 @@ resource "aws_cloudfront_distribution" "frontend" {
     include_cookies = false
   }
 
+  # Sin restricción geográfica real (blacklist vacía) — solo así CKV_AWS_374 detecta que el control existe y está configurado.
   restrictions {
     geo_restriction {
       restriction_type = "blacklist"
@@ -195,11 +206,13 @@ resource "aws_cloudfront_distribution" "frontend" {
 }
 
 
+# Busca la Hosted Zone de Route53 que ya existe para el dominio (creada manualmente, fuera de Terraform).
 data "aws_route53_zone" "main" {
   name         = "${var.domain_name}."
   private_zone = false
 }
 
+# Registro DNS tipo Alias: apunta gestorpagosg2.site directamente a la distribución de CloudFront.
 resource "aws_route53_record" "frontend" {
   zone_id = data.aws_route53_zone.main.zone_id
   name    = var.domain_name
