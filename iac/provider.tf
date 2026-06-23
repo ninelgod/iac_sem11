@@ -16,12 +16,8 @@ terraform {
     }
   }
 
-  backend "s3" {
-    bucket         = "gestorpagosg2-tfstate"
-    key            = "prod/terraform.tfstate"
-    region         = "us-east-2"
-    encrypt        = true
-    dynamodb_table = "gestorpagosg2-tfstate-lock"
+  backend "local" {
+    path = "terraform.tfstate"
   }
 }
 
