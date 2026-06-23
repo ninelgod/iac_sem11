@@ -21,3 +21,8 @@ variable "logs_bucket" {
 variable "kms_key_arn" {
   type = string
 }
+
+variable "alb_dns_name" {
+  description = "DNS name del ALB, usado como segundo origin de CloudFront para trafico dinamico /api/*"
+  type        = string
+}

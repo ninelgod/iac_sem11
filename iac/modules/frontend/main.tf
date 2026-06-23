@@ -149,6 +149,20 @@ resource "aws_cloudfront_distribution" "frontend" {
     origin_access_control_id = aws_cloudfront_origin_access_control.frontend.id
   }
 
+  # Segundo origin: el ALB de los microservicios. Trafico dinamico (/api/*) se sirve desde aqui,
+  # asi el ALB no necesita su propio registro DNS publico ni Route53 (todo entra por este dominio).
+  origin {
+    domain_name = var.alb_dns_name
+    origin_id   = "ALB-${var.name_prefix}"
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "http-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
+
   default_cache_behavior {
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
     cached_methods         = ["GET", "HEAD"]
@@ -165,6 +179,19 @@ resource "aws_cloudfront_distribution" "frontend" {
     min_ttl     = 0
     default_ttl = 86400
     max_ttl     = 31536000
+  }
+
+  # Trafico dinamico: cualquier request a /api/* se manda al ALB (no a S3), sin cache, reenviando todo (headers/cookies/query string) porque son llamadas a los microservicios.
+  ordered_cache_behavior {
+    path_pattern           = "/api/*"
+    allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods         = ["GET", "HEAD"]
+    target_origin_id       = "ALB-${var.name_prefix}"
+    viewer_protocol_policy = "redirect-to-https"
+    compress                = true
+
+    cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # AWS Managed-CachingDisabled
+    origin_request_policy_id = "216adef6-5c7f-47e4-b989-5492eafa07d3" # AWS Managed-AllViewer
   }
 
   # Para una SPA: cualquier 403/404 de S3 se reescribe a index.html (deja que el router de React/Vue/etc. decida la ruta).

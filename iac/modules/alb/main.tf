@@ -178,3 +178,52 @@ resource "aws_lb_listener_rule" "reportes" {
     target_group_arn = aws_lb_target_group.reportes.arn
   }
 }
+
+# --- Reglas HTTP para el origin de CloudFront ---
+# CloudFront llega a este ALB como origin "custom" por HTTP (no HTTPS): el certificado del listener 443
+# es para el dominio publico (gestorpagosg2.site), no para el hostname *.elb.amazonaws.com del ALB, asi
+# que TLS fallaria por mismatch de hostname. El tramo CloudFront->ALB queda dentro de la red de AWS;
+# el viewer (usuario final) siempre habla HTTPS con CloudFront. Cualquier otra ruta en el puerto 80
+# sigue redirigiendo a HTTPS (default_action de aws_lb_listener.http_redirect, sin cambios).
+
+resource "aws_lb_listener_rule" "usuarios_http" {
+  listener_arn = aws_lb_listener.http_redirect.arn
+  priority     = 100
+
+  condition {
+    path_pattern { values = ["/api/usuarios/*", "/api/auth/*"] }
+  }
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.usuarios.arn
+  }
+}
+
+resource "aws_lb_listener_rule" "pagos_http" {
+  listener_arn = aws_lb_listener.http_redirect.arn
+  priority     = 200
+
+  condition {
+    path_pattern { values = ["/api/pagos/*"] }
+  }
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.pagos.arn
+  }
+}
+
+resource "aws_lb_listener_rule" "reportes_http" {
+  listener_arn = aws_lb_listener.http_redirect.arn
+  priority     = 300
+
+  condition {
+    path_pattern { values = ["/api/reportes/*"] }
+  }
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.reportes.arn
+  }
+}

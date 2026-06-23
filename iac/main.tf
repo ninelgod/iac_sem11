@@ -117,6 +117,7 @@ module "frontend" {
   waf_acl_arn                = module.waf.cloudfront_waf_acl_arn
   logs_bucket                = module.monitoring.cloudfront_logs_bucket
   kms_key_arn                = module.kms.s3_key_arn
+  alb_dns_name               = module.alb.alb_dns_name
 }
 
 # SNS de alarmas + log groups de los 3 microservicios y de Aurora + buckets de logs (ALB/CloudFront).
