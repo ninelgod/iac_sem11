@@ -56,14 +56,6 @@ resource "aws_security_group" "ecs" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  egress {
-    description     = "Aurora PostgreSQL"
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.aurora.id]
-  }
-
   tags = { Name = "${var.name_prefix}-ecs-sg" }
 }
 
@@ -74,14 +66,6 @@ resource "aws_security_group" "aurora" {
   description = "Security group for Aurora PostgreSQL cluster"
   vpc_id      = var.vpc_id
 
-  ingress {
-    description     = "PostgreSQL from ECS tasks only"
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.ecs.id]
-  }
-
   egress {
     description = "Deny all outbound"
     from_port   = 0
@@ -91,4 +75,27 @@ resource "aws_security_group" "aurora" {
   }
 
   tags = { Name = "${var.name_prefix}-aurora-sg" }
+}
+
+# --- Reglas cruzadas ECS <-> Aurora ---
+# Separadas como recursos independientes para evitar el ciclo de dependencias
+# que se forma si se referencian con bloques ingress/egress inline en ambos SGs.
+resource "aws_security_group_rule" "ecs_egress_aurora" {
+  type                     = "egress"
+  description              = "Aurora PostgreSQL"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.ecs.id
+  source_security_group_id = aws_security_group.aurora.id
+}
+
+resource "aws_security_group_rule" "aurora_ingress_ecs" {
+  type                     = "ingress"
+  description              = "PostgreSQL from ECS tasks only"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.aurora.id
+  source_security_group_id = aws_security_group.ecs.id
 }
