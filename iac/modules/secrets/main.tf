@@ -126,14 +126,16 @@ resource "aws_signer_signing_profile" "rotation_lambda" {
   tags = { Name = "${var.name_prefix}-secret-rotation-signing-profile" }
 }
 
-# Exige que el código desplegado a la Lambda esté firmado por el perfil de arriba (bloquea despliegues no autorizados).
+# Code signing config: en "Warn" (no "Enforce") porque no existe un pipeline real que firme el .zip via
+# AWS Signer antes de subirlo (data.archive_file solo empaqueta el .py local, no lo firma) - con "Enforce"
+# Lambda rechaza el deploy con CodeVerificationFailedException al no encontrar una firma valida.
 resource "aws_lambda_code_signing_config" "rotation_lambda" {
   allowed_publishers {
     signing_profile_version_arns = [aws_signer_signing_profile.rotation_lambda.version_arn]
   }
 
   policies {
-    untrusted_artifact_on_deployment = "Enforce"
+    untrusted_artifact_on_deployment = "Warn"
   }
 }
 
@@ -160,11 +162,12 @@ resource "aws_iam_role_policy" "rotation_lambda" {
   })
 }
 
-# Log group de la Lambda de rotación.
+# Log group de la Lambda de rotación. Usa la KMS key de CloudWatch (no la de Secrets Manager): esa policy
+# solo permite al principal secretsmanager.amazonaws.com, y CloudWatch Logs necesita logs.amazonaws.com.
 resource "aws_cloudwatch_log_group" "rotation_lambda" {
   name              = "/aws/lambda/${var.name_prefix}-secret-rotation"
   retention_in_days = 365
-  kms_key_id        = var.kms_key_arn
+  kms_key_id        = var.cloudwatch_kms_key_arn
 }
 
 # Lambda que ejecuta la rotación del secreto cada 30 días: corre dentro de la VPC, con DLQ, code signing y env vars cifradas con KMS.

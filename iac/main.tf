@@ -39,13 +39,14 @@ module "ecr" {
 
 # Secrets Manager (credenciales de Aurora) + Lambda de rotación automática.
 module "secrets" {
-  source              = "./modules/secrets"
-  name_prefix         = local.name_prefix
-  kms_key_arn         = module.kms.secrets_key_arn
-  db_name             = var.db_name
-  db_master_username  = var.db_master_username
-  vpc_id              = module.networking.vpc_id
-  subnet_ids          = module.networking.private_subnet_ids
+  source                 = "./modules/secrets"
+  name_prefix            = local.name_prefix
+  kms_key_arn            = module.kms.secrets_key_arn
+  cloudwatch_kms_key_arn = module.kms.cloudwatch_key_arn
+  db_name                = var.db_name
+  db_master_username     = var.db_master_username
+  vpc_id                 = module.networking.vpc_id
+  subnet_ids             = module.networking.private_subnet_ids
 }
 
 # Web ACLs de WAF para el ALB (regional) y para CloudFront (global, en us-east-1).

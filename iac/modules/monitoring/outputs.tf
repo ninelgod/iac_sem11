@@ -1,6 +1,7 @@
 output "alb_logs_bucket" {
   description = "S3 bucket name for ALB access logs"
   value       = aws_s3_bucket.alb_logs.bucket
+  depends_on  = [aws_s3_bucket_policy.alb_logs]
 }
 
 output "cloudfront_logs_bucket" {
