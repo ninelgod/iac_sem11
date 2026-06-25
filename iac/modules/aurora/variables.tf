@@ -31,3 +31,9 @@ variable "kms_key_arn" {
 variable "cloudwatch_log_group" {
   type = string
 }
+
+variable "skip_final_snapshot" {
+  type        = bool
+  default     = false
+  description = "Skip final snapshot on destroy. Set to true for dev/test environments to avoid snapshot name conflicts on repeated destroys"
+}

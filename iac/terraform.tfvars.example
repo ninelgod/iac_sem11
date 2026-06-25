@@ -18,3 +18,8 @@ alarm_email = "ops@gestorpagosg2.com"
 
 # ECS image tag (updated by CI/CD)
 ecr_image_tag = "latest"
+
+# Aurora snapshot handling
+# Set to true for dev/test environments to avoid "snapshot already exists" errors on repeated terraform destroy
+# Set to false (default) for prod to keep final snapshots
+skip_final_snapshot = false

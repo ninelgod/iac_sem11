@@ -90,6 +90,7 @@ module "aurora" {
   db_master_password   = module.secrets.db_master_password
   kms_key_arn          = module.kms.rds_key_arn
   cloudwatch_log_group = module.monitoring.aurora_log_group_name
+  skip_final_snapshot  = var.skip_final_snapshot
 }
 
 # Cluster ECS Fargate con las 3 task definitions/services y su auto scaling.
