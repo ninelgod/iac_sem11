@@ -38,7 +38,7 @@ resource "aws_rds_cluster" "main" {
   cluster_identifier = "${var.name_prefix}-aurora-cluster"
   engine             = "aurora-postgresql"
   engine_mode        = "provisioned"
-  engine_version     = "16.1"
+  engine_version     = "16.4"
   database_name      = var.db_name
 
   master_username = var.db_master_username
@@ -61,9 +61,9 @@ resource "aws_rds_cluster" "main" {
   backup_retention_period   = 7
   preferred_backup_window   = "03:00-04:00"
   copy_tags_to_snapshot     = true
-  skip_final_snapshot       = var.skip_final_snapshot
-  final_snapshot_identifier = var.skip_final_snapshot ? null : "${var.name_prefix}-final-snapshot"
-  deletion_protection       = false
+  skip_final_snapshot       = false
+  final_snapshot_identifier = "${var.name_prefix}-final-snapshot"
+  deletion_protection       = true
 
   iam_database_authentication_enabled = true
 
