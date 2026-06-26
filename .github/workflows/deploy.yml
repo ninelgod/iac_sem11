@@ -164,7 +164,9 @@ jobs:
         id: meta
         env:
           SERVICE: ${{ matrix.service }}
-          IMAGE_TAG: prod-${{ github.sha }}
+          # run_attempt evita chocar con el tag anterior: los repos ECR son IMMUTABLE, asi que un
+          # "Re-run" del mismo commit con el mismo tag (prod-sha) fallaria con ImageAlreadyExistsException.
+          IMAGE_TAG: prod-${{ github.sha }}-${{ github.run_attempt }}
         run: |
           IMAGE_URI="${ECR_REGISTRY}/gestorpagosg2-prod-${SERVICE}:${IMAGE_TAG}"
           docker build \
@@ -218,7 +220,9 @@ jobs:
         with:
           task-definition: task-def.json
           container-name: ${{ matrix.service }}
-          image: ${{ env.ECR_REGISTRY }}/gestorpagosg2-prod-${{ matrix.service }}:prod-${{ github.sha }}
+          # Usa el tag que build-and-push realmente pusheo (incluye run_attempt) en vez de recalcularlo
+          # aparte - si no, este job intentaria desplegar un tag que nunca se subio a ECR.
+          image: ${{ env.ECR_REGISTRY }}/gestorpagosg2-prod-${{ matrix.service }}:${{ needs.build-and-push.outputs.image-tag }}
 
       - name: Deploy updated task definition to ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
