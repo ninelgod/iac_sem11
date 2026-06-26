@@ -101,6 +101,26 @@ resource "aws_s3_bucket_policy" "frontend" {
 }
 
 
+# CloudFront Function (corre en el edge, no es Lambda@Edge): si la ruta no tiene extension de archivo,
+# la reescribe a /index.html para que el router de la SPA decida que mostrar. Solo se asocia al
+# default_cache_behavior (S3) - el comportamiento de /api/* no la lleva, asi el ALB recibe la ruta tal cual.
+resource "aws_cloudfront_function" "spa_rewrite" {
+  name    = "${var.name_prefix}-spa-rewrite"
+  runtime = "cloudfront-js-2.0"
+  comment = "Rewrite de rutas sin extension a index.html para el router de la SPA"
+  publish = true
+  code    = <<-EOT
+    function handler(event) {
+      var request = event.request;
+      var uri = request.uri;
+      if (!uri.includes('.')) {
+        request.uri = '/index.html';
+      }
+      return request;
+    }
+  EOT
+}
+
 # Headers de seguridad que CloudFront agrega a cada respuesta (HSTS, anti-clickjacking, anti-MIME-sniffing, etc.).
 resource "aws_cloudfront_response_headers_policy" "security_headers" {
   name = "${var.name_prefix}-security-headers"
@@ -171,6 +191,14 @@ resource "aws_cloudfront_distribution" "frontend" {
     compress                   = true
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security_headers.id
 
+    # Reescribe rutas de la SPA (sin extension) a index.html ANTES de llegar a S3. Reemplaza el truco
+    # de custom_error_response (403/404 -> index.html): ese es global en CloudFront y rompía las
+    # respuestas reales de error del ALB en /api/* (un 404 de una API se devolvía como 200 con el HTML).
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.spa_rewrite.arn
+    }
+
     forwarded_values {
       query_string = false
       cookies { forward = "none" }
@@ -192,21 +220,6 @@ resource "aws_cloudfront_distribution" "frontend" {
 
     cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # AWS Managed-CachingDisabled
     origin_request_policy_id = "216adef6-5c7f-47e4-b989-5492eafa07d3" # AWS Managed-AllViewer
-  }
-
-  # Para una SPA: cualquier 403/404 de S3 se reescribe a index.html (deja que el router de React/Vue/etc. decida la ruta).
-  custom_error_response {
-    error_code            = 403
-    response_code         = 200
-    response_page_path    = "/index.html"
-    error_caching_min_ttl = 10
-  }
-
-  custom_error_response {
-    error_code            = 404
-    response_code         = 200
-    response_page_path    = "/index.html"
-    error_caching_min_ttl = 10
   }
 
   viewer_certificate {
