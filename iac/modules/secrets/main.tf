@@ -118,27 +118,6 @@ resource "aws_iam_role_policy" "rotation_lambda_dlq" {
   })
 }
 
-# Perfil de firma de AWS Signer: certifica que el código de la Lambda viene de una fuente confiable.
-resource "aws_signer_signing_profile" "rotation_lambda" {
-  platform_id = "AWSLambda-SHA384-ECDSA"
-  name_prefix = "secret_rotation_"
-
-  tags = { Name = "${var.name_prefix}-secret-rotation-signing-profile" }
-}
-
-# Code signing config: en "Warn" (no "Enforce") porque no existe un pipeline real que firme el .zip via
-# AWS Signer antes de subirlo (data.archive_file solo empaqueta el .py local, no lo firma) - con "Enforce"
-# Lambda rechaza el deploy con CodeVerificationFailedException al no encontrar una firma valida.
-resource "aws_lambda_code_signing_config" "rotation_lambda" {
-  allowed_publishers {
-    signing_profile_version_arns = [aws_signer_signing_profile.rotation_lambda.version_arn]
-  }
-
-  policies {
-    untrusted_artifact_on_deployment = "Warn"
-  }
-}
-
 # Permisos en runtime de la Lambda: leer/actualizar el secreto de Aurora y usar la KMS key para descifrarlo.
 resource "aws_iam_role_policy" "rotation_lambda" {
   name = "${var.name_prefix}-secret-rotation-policy"
@@ -170,7 +149,7 @@ resource "aws_cloudwatch_log_group" "rotation_lambda" {
   kms_key_id        = var.cloudwatch_kms_key_arn
 }
 
-# Lambda que ejecuta la rotación del secreto cada 30 días: corre dentro de la VPC, con DLQ, code signing y env vars cifradas con KMS.
+# Lambda que ejecuta la rotación del secreto cada 30 días: corre dentro de la VPC, con DLQ y env vars cifradas con KMS.
 resource "aws_lambda_function" "rotate_secret" {
   function_name = "${var.name_prefix}-secret-rotation"
   role          = aws_iam_role.rotation_lambda.arn
@@ -180,9 +159,8 @@ resource "aws_lambda_function" "rotate_secret" {
   filename         = data.archive_file.rotation_lambda.output_path
   source_code_hash = data.archive_file.rotation_lambda.output_base64sha256
 
-  kms_key_arn                   = var.kms_key_arn
+  kms_key_arn                    = var.kms_key_arn
   reserved_concurrent_executions = 5
-  code_signing_config_arn        = aws_lambda_code_signing_config.rotation_lambda.arn
 
   environment {
     variables = {

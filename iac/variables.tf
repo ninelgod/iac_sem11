@@ -57,13 +57,23 @@ variable "domain_name" {
 }
 
 variable "certificate_arn" {
-  description = "ACM certificate ARN (us-east-2) for ALB HTTPS listener"
+  description = "ARN de un certificado ACM ya emitido en us-east-2 para el listener HTTPS del ALB. Terraform no crea este certificado."
   type        = string
+
+  validation {
+    condition     = can(regex("^arn:aws:acm:us-east-2:[0-9]{12}:certificate/.+", var.certificate_arn))
+    error_message = "certificate_arn debe ser un ARN válido de ACM en us-east-2 y debe existir antes de ejecutar terraform apply."
+  }
 }
 
 variable "cloudfront_certificate_arn" {
-  description = "ACM certificate ARN (us-east-1) for CloudFront HTTPS"
+  description = "ARN de un certificado ACM ya emitido en us-east-1 para CloudFront HTTPS. Terraform no crea este certificado."
   type        = string
+
+  validation {
+    condition     = can(regex("^arn:aws:acm:us-east-1:[0-9]{12}:certificate/.+", var.cloudfront_certificate_arn))
+    error_message = "cloudfront_certificate_arn debe ser un ARN válido de ACM en us-east-1, requerido por CloudFront."
+  }
 }
 
 variable "db_name" {
@@ -88,4 +98,10 @@ variable "ecr_image_tag" {
   description = "Container image tag to deploy"
   type        = string
   default     = "latest"
+}
+
+variable "skip_final_snapshot" {
+  description = "Skip final snapshot on Aurora destroy. Set to true for dev/test to avoid snapshot name conflicts on repeated destroys"
+  type        = bool
+  default     = false
 }
