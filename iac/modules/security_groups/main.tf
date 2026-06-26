@@ -50,12 +50,31 @@ resource "aws_security_group" "ecs" {
     security_groups = [aws_security_group.alb.id]
   }
 
+  # Sin esta regla, ECS Service Connect no funciona: las llamadas entre microservicios (ej. reportes -> pagos)
+  # usan estos mismos puertos pero entre tareas del propio SG, no desde el ALB.
+  ingress {
+    description = "Service Connect entre microservicios (mismo SG)"
+    from_port   = 3000
+    to_port     = 3002
+    protocol    = "tcp"
+    self        = true
+  }
+
   egress {
     description = "HTTPS to AWS services (ECR, Cognito, Secrets Manager)"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Salida hacia otros microservicios via Service Connect (mismo SG, mismos puertos de app).
+  egress {
+    description = "Service Connect entre microservicios (mismo SG)"
+    from_port   = 3000
+    to_port     = 3002
+    protocol    = "tcp"
+    self        = true
   }
 
   tags = { Name = "${var.name_prefix}-ecs-sg" }
