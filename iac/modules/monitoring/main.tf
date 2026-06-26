@@ -73,13 +73,14 @@ resource "aws_s3_bucket_versioning" "alb_logs" {
   versioning_configuration { status = "Enabled" }
 }
 
-# Cifrado del bucket de logs del ALB con la KMS key dedicada a logs.
+# Cifrado del bucket de logs del ALB. AES256 (no KMS): ALB access logs no soporta buckets cifrados con
+# SSE-KMS (limitacion del producto, no de permisos) - con aws:kms este bucket siempre falla con Access Denied.
 resource "aws_s3_bucket_server_side_encryption_configuration" "alb_logs" {
+  #checkov:skip=CKV_AWS_145:ALB access logs no soporta buckets con cifrado SSE-KMS; AES256 es el unico modo compatible para este bucket especifico
   bucket = aws_s3_bucket.alb_logs.id
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm     = "aws:kms"
-      kms_master_key_id = var.kms_key_arn
+      sse_algorithm = "AES256"
     }
   }
 }
