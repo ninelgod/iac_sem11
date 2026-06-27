@@ -52,9 +52,6 @@ resource "aws_cognito_user_pool" "main" {
   # Deletion protection
   deletion_protection = "ACTIVE"
 
-  # CloudWatch logs
-  lambda_config {}
-
   tags = { Name = "${var.name_prefix}-user-pool" }
 }
 
