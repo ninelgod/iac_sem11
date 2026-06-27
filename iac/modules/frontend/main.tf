@@ -101,21 +101,22 @@ resource "aws_s3_bucket_policy" "frontend" {
 }
 
 
-# CloudFront Function (corre en el edge, no es Lambda@Edge): si la ruta no tiene extension de archivo,
-# la reescribe a /index.html para que el router de la SPA decida que mostrar. Solo se asocia al
-# default_cache_behavior (S3) - el comportamiento de /api/* no la lleva, asi el ALB recibe la ruta tal cual.
+# CloudFront Function: reescribe rutas sin extension (las del router de la SPA) a /index.html ANTES de
+# llegar al origin. Reemplaza a custom_error_response (que es global y rompia los codigos 403/404 reales
+# que devuelve el ALB en /api/*) por algo scopeado solo al default_cache_behavior (S3/frontend).
 resource "aws_cloudfront_function" "spa_rewrite" {
   name    = "${var.name_prefix}-spa-rewrite"
   runtime = "cloudfront-js-2.0"
-  comment = "Rewrite de rutas sin extension a index.html para el router de la SPA"
   publish = true
   code    = <<-EOT
     function handler(event) {
       var request = event.request;
       var uri = request.uri;
+
       if (!uri.includes('.')) {
         request.uri = '/index.html';
       }
+
       return request;
     }
   EOT
@@ -191,17 +192,14 @@ resource "aws_cloudfront_distribution" "frontend" {
     compress                   = true
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security_headers.id
 
-    # Reescribe rutas de la SPA (sin extension) a index.html ANTES de llegar a S3. Reemplaza el truco
-    # de custom_error_response (403/404 -> index.html): ese es global en CloudFront y rompía las
-    # respuestas reales de error del ALB en /api/* (un 404 de una API se devolvía como 200 con el HTML).
-    function_association {
-      event_type   = "viewer-request"
-      function_arn = aws_cloudfront_function.spa_rewrite.arn
-    }
-
     forwarded_values {
       query_string = false
       cookies { forward = "none" }
+    }
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.spa_rewrite.arn
     }
 
     min_ttl     = 0
