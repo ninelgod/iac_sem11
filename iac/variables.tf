@@ -53,7 +53,7 @@ variable "private_db_subnet_cidrs" {
 variable "domain_name" {
   description = "Root domain name"
   type        = string
-  default     = "gestorpagosg2.com"
+  default     = "gestorpagosg2.site"
 }
 
 variable "certificate_arn" {
