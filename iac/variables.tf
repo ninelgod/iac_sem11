@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "environment" {
   description = "Environment name"
   type        = string
-  default     = "prod"
+  default     = "dev"
   validation {
     condition     = contains(["prod", "staging", "dev"], var.environment)
     error_message = "Environment must be prod, staging, or dev."
