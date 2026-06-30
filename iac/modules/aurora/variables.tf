@@ -28,10 +28,6 @@ variable "kms_key_arn" {
   type = string
 }
 
-variable "cloudwatch_log_group" {
-  type = string
-}
-
 variable "skip_final_snapshot" {
   type        = bool
   default     = false
