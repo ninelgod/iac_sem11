@@ -107,6 +107,7 @@ resource "aws_s3_bucket_policy" "frontend" {
 resource "aws_cloudfront_function" "spa_rewrite" {
   name    = "${var.name_prefix}-spa-rewrite"
   runtime = "cloudfront-js-2.0"
+  comment = "Rewrite de rutas SPA sin extension a index.html"
   publish = true
   code    = <<-EOT
     function handler(event) {
