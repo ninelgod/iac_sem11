@@ -147,6 +147,16 @@ resource "aws_s3_bucket" "cloudfront_logs" {
   tags = { Name = "${var.name_prefix}-cloudfront-access-logs" }
 }
 
+# CloudFront access logs (logging_config) usa el mecanismo de entrega clasico, que exige ACLs habilitadas en el
+# bucket destino - con el default actual de AWS (BucketOwnerEnforced, ACLs deshabilitadas) la distribucion falla
+# con "does not enable ACL access". BucketOwnerPreferred reactiva ACLs sin perder el ownership del bucket.
+resource "aws_s3_bucket_ownership_controls" "cloudfront_logs" {
+  bucket = aws_s3_bucket.cloudfront_logs.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
 # Access logs del bucket de logs de CloudFront — apuntan de vuelta al bucket de logs del ALB (logging cruzado).
 resource "aws_s3_bucket_logging" "cloudfront_logs" {
   bucket        = aws_s3_bucket.cloudfront_logs.id
