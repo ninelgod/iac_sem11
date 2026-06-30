@@ -233,10 +233,12 @@ resource "aws_cloudfront_distribution" "frontend" {
     include_cookies = false
   }
 
-  # Sin restricción geográfica real (blacklist vacía) — solo así CKV_AWS_374 detecta que el control existe y está configurado.
+  # Sin restriccion geografica real. "blacklist" con locations=[] es rechazado por la API real de CloudFront
+  # (InvalidGeoRestrictionParameter) aunque Terraform lo valide bien - "none" es el unico tipo que acepta lista vacia.
+  #checkov:skip=CKV_AWS_374:Proyecto sin requisito de bloqueo geografico; "blacklist" con lista vacia es rechazado por la API real de CloudFront (InvalidGeoRestrictionParameter)
   restrictions {
     geo_restriction {
-      restriction_type = "blacklist"
+      restriction_type = "none"
       locations        = []
     }
   }
