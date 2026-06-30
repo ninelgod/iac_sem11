@@ -58,7 +58,7 @@ resource "aws_s3_bucket" "alb_logs" {
   #checkov:skip=CKV_AWS_144:Bucket de logs de una sola region; los logs expiran a los 365 dias, no se justifica replicacion cross-region
   #checkov:skip=CKV2_AWS_62:Bucket de logs sin consumidores de eventos; nadie procesa estos logs via notificaciones S3
   bucket        = "${var.name_prefix}-alb-access-logs"
-  force_destroy = false
+  force_destroy = true
 
   tags = { Name = "${var.name_prefix}-alb-access-logs" }
 }
