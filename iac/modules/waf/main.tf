@@ -118,9 +118,6 @@ resource "aws_cloudwatch_log_group" "waf_alb" {
 }
 
 # --- WAF for CloudFront (CLOUDFRONT must be us-east-1) ---
-# NOTE: CloudFront WAF must be created in us-east-1 via a separate provider alias.
-# Here we output a placeholder ARN; teams should deploy waf/cloudfront in a us-east-1 stack.
-# See: modules/waf/cloudfront_waf/main.tf for the us-east-1 WAF resource.
 
 # Web ACL global (scope CLOUDFRONT) asociado a la distribución de CloudFront. AWS exige que viva en us-east-1 sí o sí.
 resource "aws_wafv2_web_acl" "cloudfront" {
