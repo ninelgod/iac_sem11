@@ -101,6 +101,27 @@ resource "aws_s3_bucket_policy" "frontend" {
 }
 
 
+# CloudFront Function: reescribe rutas sin extension (las del router de la SPA) a /index.html ANTES de
+# llegar al origin. Reemplaza a custom_error_response (que es global y rompia los codigos 403/404 reales
+# que devuelve el ALB en /api/*) por algo scopeado solo al default_cache_behavior (S3/frontend).
+resource "aws_cloudfront_function" "spa_rewrite" {
+  name    = "${var.name_prefix}-spa-rewrite"
+  runtime = "cloudfront-js-2.0"
+  publish = true
+  code    = <<-EOT
+    function handler(event) {
+      var request = event.request;
+      var uri = request.uri;
+
+      if (!uri.includes('.')) {
+        request.uri = '/index.html';
+      }
+
+      return request;
+    }
+  EOT
+}
+
 # Headers de seguridad que CloudFront agrega a cada respuesta (HSTS, anti-clickjacking, anti-MIME-sniffing, etc.).
 resource "aws_cloudfront_response_headers_policy" "security_headers" {
   name = "${var.name_prefix}-security-headers"
@@ -176,6 +197,11 @@ resource "aws_cloudfront_distribution" "frontend" {
       cookies { forward = "none" }
     }
 
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.spa_rewrite.arn
+    }
+
     min_ttl     = 0
     default_ttl = 86400
     max_ttl     = 31536000
@@ -192,21 +218,6 @@ resource "aws_cloudfront_distribution" "frontend" {
 
     cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # AWS Managed-CachingDisabled
     origin_request_policy_id = "216adef6-5c7f-47e4-b989-5492eafa07d3" # AWS Managed-AllViewer
-  }
-
-  # Para una SPA: cualquier 403/404 de S3 se reescribe a index.html (deja que el router de React/Vue/etc. decida la ruta).
-  custom_error_response {
-    error_code            = 403
-    response_code         = 200
-    response_page_path    = "/index.html"
-    error_caching_min_ttl = 10
-  }
-
-  custom_error_response {
-    error_code            = 404
-    response_code         = 200
-    response_page_path    = "/index.html"
-    error_caching_min_ttl = 10
   }
 
   viewer_certificate {
