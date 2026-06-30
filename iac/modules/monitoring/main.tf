@@ -42,9 +42,11 @@ resource "aws_cloudwatch_log_group" "ecs_reportes" {
   tags              = { Name = "${var.name_prefix}-ecs-reportes-logs" }
 }
 
-# Log group de las queries de Aurora (exportadas desde el cluster).
+# Log group de las queries de Aurora (exportadas desde el cluster). El nombre debe coincidir EXACTO con el
+# que Aurora arma solo a partir de su cluster_identifier (name_prefix-aurora-cluster), si no, AWS crea su
+# propio log group por separado (sin esta KMS key ni esta retencion) y este queda vacio.
 resource "aws_cloudwatch_log_group" "aurora" {
-  name              = "/aws/rds/cluster/${var.name_prefix}/postgresql"
+  name              = "/aws/rds/cluster/${var.name_prefix}-aurora-cluster/postgresql"
   retention_in_days = 365
   kms_key_id        = var.kms_key_arn
   tags              = { Name = "${var.name_prefix}-aurora-logs" }

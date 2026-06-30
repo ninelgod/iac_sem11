@@ -89,7 +89,6 @@ module "aurora" {
   db_master_username   = var.db_master_username
   db_master_password   = module.secrets.db_master_password
   kms_key_arn          = module.kms.rds_key_arn
-  cloudwatch_log_group = module.monitoring.aurora_log_group_name
   skip_final_snapshot  = var.skip_final_snapshot
 }
 
@@ -103,7 +102,7 @@ module "ecs" {
   alb_target_group_arns = module.alb.target_group_arns
   ecr_repository_urls   = module.ecr.repository_urls
   ecr_image_tag         = var.ecr_image_tag
-  kms_key_arn           = module.kms.cloudwatch_key_arn
+  kms_key_arn           = module.kms.secrets_key_arn
   secrets_arn           = module.secrets.db_secret_arn
   cognito_user_pool_id  = module.cognito.user_pool_id
   aurora_endpoint       = module.aurora.cluster_endpoint
