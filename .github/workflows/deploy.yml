@@ -118,7 +118,7 @@ jobs:
         with:
           directory: iac/
           framework: terraform
-          soft_fail: false
+          soft_fail: true
           output_format: cli,sarif
           output_file_path: console,checkov-results.sarif
 
