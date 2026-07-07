@@ -1,27 +1,31 @@
 const express = require("express");
+const { Pool } = require("pg");
+const { createRouter } = require("./routes/reportes.routes");
 
-const app = express();
-const port = process.env.PORT || 3002;
+function createApp(pool) {
+  const app = express();
+  app.disable("x-powered-by");
+  app.use(express.json());
+  app.use("/", createRouter(pool));
+  return app;
+}
 
-app.use(express.json());
+const PORT = Number.parseInt(process.env.PORT || "3002");
 
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok", service: "reportes" });
-});
-
-app.get("/reportes", (req, res) => {
-  res.status(200).json({
-    service: "reportes",
-    db_host: process.env.DB_HOST || null,
-    db_name: process.env.DB_NAME || null,
-    resumen: {
-      total_prestamos: 25,
-      total_pagado: 4500.75,
-      total_pendiente: 1200.0,
-    },
+if (require.main === module) {
+  const pool = new Pool({
+    host:     process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    user:     process.env.DB_USERNAME,
+    password: process.env.DB_PASSWORD,
+    port:     5432,
+    ssl:      { rejectUnauthorized: false },
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis:       30000,
+    max: 10,
   });
-});
+  const app = createApp(pool);
+  app.listen(PORT, () => console.log(`reportes service listening on port ${PORT}`));
+}
 
-app.listen(port, () => {
-  console.log(`reportes service listening on port ${port}`);
-});
+module.exports = { createApp };

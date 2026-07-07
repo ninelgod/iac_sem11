@@ -164,18 +164,19 @@ jobs:
         id: meta
         env:
           SERVICE: ${{ matrix.service }}
-          # run_attempt evita chocar con el tag anterior: los repos ECR son IMMUTABLE, asi que un
-          # "Re-run" del mismo commit con el mismo tag (prod-sha) fallaria con ImageAlreadyExistsException.
           IMAGE_TAG: prod-${{ github.sha }}-${{ github.run_attempt }}
         run: |
           IMAGE_URI="${ECR_REGISTRY}/gestorpagosg2-prod-${SERVICE}:${IMAGE_TAG}"
+          LATEST_URI="${ECR_REGISTRY}/gestorpagosg2-prod-${SERVICE}:latest"
           docker build \
             --file services/${SERVICE}/Dockerfile \
             --tag "${IMAGE_URI}" \
+            --tag "${LATEST_URI}" \
             --label "git-sha=${{ github.sha }}" \
             --label "service=${SERVICE}" \
             .
           docker push "${IMAGE_URI}"
+          docker push "${LATEST_URI}"
           echo "tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
           echo "uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
 
