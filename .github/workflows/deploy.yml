@@ -233,3 +233,38 @@ jobs:
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
           codedeploy-appspec: false
+
+  # -------------------------------------------------------------------
+  # DEPLOY FRONTEND — sube archivos estáticos a S3 e invalida CloudFront
+  # -------------------------------------------------------------------
+  deploy-frontend:
+    name: Deploy Frontend to S3
+    needs: [test, sonarqube, checkov]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload to S3
+        run: |
+          aws s3 sync . s3://gestorpagosg2-prod-web/ \
+            --exclude "*" \
+            --include "index.html" \
+            --delete \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id E1CL9KCGY67CPM \
+            --paths "/*"
