@@ -137,6 +137,11 @@ jobs:
     outputs:
       cloudfront_distribution_id: ${{ steps.tf-outputs.outputs.cloudfront_distribution_id }}
 
+    env:
+      TF_VAR_alarm_email: ${{ vars.ALARM_EMAIL }}
+      TF_VAR_certificate_arn: ${{ secrets.CERTIFICATE_ARN }}
+      TF_VAR_cloudfront_certificate_arn: ${{ secrets.CLOUDFRONT_CERTIFICATE_ARN }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -154,26 +159,18 @@ jobs:
       - name: Terraform Init
         working-directory: iac/
         run: terraform init
-        env:
-          TF_VAR_alarm_email: ${{ vars.ALARM_EMAIL }}
 
       - name: Terraform Validate
         working-directory: iac/
         run: terraform validate
-        env:
-          TF_VAR_alarm_email: ${{ vars.ALARM_EMAIL }}
 
       - name: Terraform Plan
         working-directory: iac/
         run: terraform plan -out=tfplan
-        env:
-          TF_VAR_alarm_email: ${{ vars.ALARM_EMAIL }}
 
       - name: Terraform Apply
         working-directory: iac/
         run: terraform apply -auto-approve tfplan
-        env:
-          TF_VAR_alarm_email: ${{ vars.ALARM_EMAIL }}
 
       - name: Capture Terraform Outputs
         id: tf-outputs
@@ -181,8 +178,6 @@ jobs:
         run: |
           CF_ID=$(terraform output -raw cloudfront_distribution_id)
           echo "cloudfront_distribution_id=$CF_ID" >> "$GITHUB_OUTPUT"
-        env:
-          TF_VAR_alarm_email: ${{ vars.ALARM_EMAIL }}
 
   # BUILD & PUSH — solo en push a main (no en PRs)
   build-and-push:
