@@ -138,6 +138,7 @@ jobs:
       cloudfront_distribution_id: ${{ steps.tf-outputs.outputs.cloudfront_distribution_id }}
 
     env:
+      TF_VAR_environment: prod
       TF_VAR_alarm_email: ${{ vars.ALARM_EMAIL }}
       TF_VAR_certificate_arn: ${{ secrets.CERTIFICATE_ARN }}
       TF_VAR_cloudfront_certificate_arn: ${{ secrets.CLOUDFRONT_CERTIFICATE_ARN }}
