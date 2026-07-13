@@ -160,6 +160,7 @@ resource "aws_lambda_function" "rotate_secret" {
   source_code_hash = data.archive_file.rotation_lambda.output_base64sha256
 
   #checkov:skip=CKV_AWS_115:Cuenta AWS (academica/sandbox) con cuota de concurrencia muy baja; reservar cualquier valor aqui baja el UnreservedConcurrentExecution de la cuenta por debajo del minimo de 10 que exige AWS
+  #checkov:skip=CKV_AWS_272:AWS Signer no disponible en cuenta academica sandbox; firma de codigo no aplicable en este contexto
   kms_key_arn = var.kms_key_arn
 
   environment {

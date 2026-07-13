@@ -1,6 +1,7 @@
 # El Application Load Balancer público: punto de entrada para el tráfico dinámico/API de los microservicios.
 resource "aws_lb" "main" {
   #checkov:skip=CKV2_AWS_76:El WAFv2 ACL asociado (modules/waf) ya incluye AWSManagedRulesKnownBadInputsRuleSet con cobertura Log4j; Checkov no resuelve la asociacion cross-module
+  #checkov:skip=CKV_AWS_150:Deletion protection deshabilitada para permitir terraform destroy en entorno academico sin intervencion manual previa
   name               = "${var.name_prefix}-alb"
   internal           = false
   load_balancer_type = "application"

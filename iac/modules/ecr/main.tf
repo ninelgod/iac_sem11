@@ -1,5 +1,6 @@
 # Un repositorio ECR por microservicio (usuarios/pagos/reportes) donde se guardan sus imágenes Docker.
 resource "aws_ecr_repository" "service" {
+  #checkov:skip=CKV_AWS_51:Tags MUTABLE requeridos para reutilizar el tag :latest en cada push del pipeline CI/CD; imagenes anteriores conservadas por lifecycle policy
   for_each = toset(var.services)
 
   name                 = "${var.name_prefix}-${each.key}"

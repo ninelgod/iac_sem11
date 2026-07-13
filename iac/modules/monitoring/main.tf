@@ -57,6 +57,7 @@ resource "aws_cloudwatch_log_group" "aurora" {
 resource "aws_s3_bucket" "alb_logs" {
   #checkov:skip=CKV_AWS_144:Bucket de logs de una sola region; los logs expiran a los 365 dias, no se justifica replicacion cross-region
   #checkov:skip=CKV2_AWS_62:Bucket de logs sin consumidores de eventos; nadie procesa estos logs via notificaciones S3
+  #checkov:skip=CKV_AWS_145:ALB access logs no soporta SSE-KMS (limitacion del producto AWS); cifrado configurado con AES256 en recurso separado
   bucket        = "${var.name_prefix}-alb-access-logs"
   force_destroy = true
 
@@ -151,6 +152,7 @@ resource "aws_s3_bucket" "cloudfront_logs" {
 # bucket destino - con el default actual de AWS (BucketOwnerEnforced, ACLs deshabilitadas) la distribucion falla
 # con "does not enable ACL access". BucketOwnerPreferred reactiva ACLs sin perder el ownership del bucket.
 resource "aws_s3_bucket_ownership_controls" "cloudfront_logs" {
+  #checkov:skip=CKV2_AWS_65:CloudFront log delivery clasico requiere BucketOwnerPreferred para escribir logs via ACLs; BucketOwnerEnforced rompe la entrega de logs
   bucket = aws_s3_bucket.cloudfront_logs.id
   rule {
     object_ownership = "BucketOwnerPreferred"
