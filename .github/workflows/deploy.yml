@@ -134,6 +134,9 @@ jobs:
       id-token: write
       contents: read
 
+    outputs:
+      cloudfront_distribution_id: ${{ steps.tf-outputs.outputs.cloudfront_distribution_id }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -164,10 +167,17 @@ jobs:
         working-directory: iac/
         run: terraform apply -auto-approve tfplan
 
+      - name: Capture Terraform Outputs
+        id: tf-outputs
+        working-directory: iac/
+        run: |
+          CF_ID=$(terraform output -raw cloudfront_distribution_id)
+          echo "cloudfront_distribution_id=$CF_ID" >> "$GITHUB_OUTPUT"
+
   # BUILD & PUSH — solo en push a main (no en PRs)
   build-and-push:
     name: Build & Push to ECR
-    needs: [test, sonarqube, checkov]
+    needs: [test, sonarqube, checkov, terraform]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -269,7 +279,7 @@ jobs:
   # DEPLOY FRONTEND — sube archivos estáticos a S3 e invalida CloudFront
   deploy-frontend:
     name: Deploy Frontend to S3
-    needs: [test, sonarqube, checkov]
+    needs: [test, sonarqube, checkov, terraform]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -296,5 +306,5 @@ jobs:
       - name: Invalidate CloudFront cache
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id E1CL9KCGY67CPM \
+            --distribution-id ${{ needs.terraform.outputs.cloudfront_distribution_id }} \
             --paths "/*"

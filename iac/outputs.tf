@@ -13,6 +13,11 @@ output "cloudfront_domain_name" {
   value       = module.frontend.cloudfront_domain_name
 }
 
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID for cache invalidation"
+  value       = module.frontend.cloudfront_distribution_id
+}
+
 output "ecr_repository_urls" {
   description = "ECR repository URLs per microservice"
   value       = module.ecr.repository_urls
