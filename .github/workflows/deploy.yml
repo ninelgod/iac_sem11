@@ -33,9 +33,7 @@ jobs:
       - name: Lint
         run: npm run lint || true
 
-  # -------------------------------------------------------------------
   # SONARQUBE — analisis de calidad y seguridad del codigo
-  # -------------------------------------------------------------------
   sonarqube:
     name: SonarQube Analysis
     runs-on: ubuntu-latest
@@ -101,9 +99,7 @@ jobs:
         working-directory: sonarqube
         run: docker compose down -v
 
-  # -------------------------------------------------------------------
   # CHECKOV — escaneo de seguridad de la IaC
-  # -------------------------------------------------------------------
   checkov:
     name: Checkov IaC Scan
     runs-on: ubuntu-latest
@@ -118,7 +114,7 @@ jobs:
         with:
           directory: iac/
           framework: terraform
-          soft_fail: true
+          soft_fail: false
           output_format: cli,sarif
           output_file_path: console,checkov-results.sarif
 
@@ -128,9 +124,47 @@ jobs:
         with:
           sarif_file: checkov-results.sarif
 
-  # -------------------------------------------------------------------
+  # TERRAFORM — valida y aplica cambios de infraestructura en cada push a main
+  terraform:
+    name: Terraform Apply
+    needs: [checkov]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.0"
+
+      - name: Terraform Init
+        working-directory: iac/
+        run: terraform init
+
+      - name: Terraform Validate
+        working-directory: iac/
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: iac/
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: iac/
+        run: terraform apply -auto-approve tfplan
+
   # BUILD & PUSH — solo en push a main (no en PRs)
-  # -------------------------------------------------------------------
   build-and-push:
     name: Build & Push to ECR
     needs: [test, sonarqube, checkov]
@@ -180,9 +214,7 @@ jobs:
           echo "tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
           echo "uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
 
-  # -------------------------------------------------------------------
   # DEPLOY — actualiza la task definition y fuerza nuevo deployment en ECS
-  # -------------------------------------------------------------------
   deploy:
     name: Deploy to ECS
     needs: build-and-push
@@ -234,9 +266,7 @@ jobs:
           wait-for-service-stability: true
           codedeploy-appspec: false
 
-  # -------------------------------------------------------------------
   # DEPLOY FRONTEND — sube archivos estáticos a S3 e invalida CloudFront
-  # -------------------------------------------------------------------
   deploy-frontend:
     name: Deploy Frontend to S3
     needs: [test, sonarqube, checkov]
