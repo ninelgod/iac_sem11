@@ -20,6 +20,7 @@ function getJwksClient() {
 }
 
 function verifyJWT(req, res, next) {
+  if (req.url === "/health") return next();
   if (process.env.NODE_ENV === "test" || !process.env.COGNITO_USER_POOL_ID) {
     return next();
   }
