@@ -34,17 +34,11 @@ resource "aws_secretsmanager_secret_version" "db" {
   })
 }
 
-# Activa la rotación automática del secreto cada 30 días, invocando la Lambda de abajo.
-resource "aws_secretsmanager_secret_rotation" "db" {
-  secret_id           = aws_secretsmanager_secret.db.id
-  rotation_lambda_arn = aws_lambda_function.rotate_secret.arn
-
-  rotation_rules {
-    automatically_after_days = 30
-  }
-
-  depends_on = [aws_lambda_permission.secrets_manager]
-}
+# Rotación automática deshabilitada: la Lambda carece de acceso al puerto 5432 de Aurora
+# (SG solo permite 443) y no tiene DB_HOST configurado, por lo que la rotación fallaba
+# en el paso setSecret dejando AWSPENDING sin promover correctamente.
+# Para un entorno productivo real, usar la SAR managed rotation function en su lugar:
+# arn:aws:serverlessrepo:us-east-1:297356227824:applications/SecretsManagerRDSPostgreSQLRotationSingleUser
 
 # --- Lambda for secret rotation ---
 
