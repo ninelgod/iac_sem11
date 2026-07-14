@@ -1,26 +1,20 @@
 data "aws_region" "current" {}
 
-# User Pool de Cognito: aquí se registran y autentican los usuarios de la app (login con email).
+# User Pool de Cognito para la autenticación de usuarios.
 resource "aws_cognito_user_pool" "main" {
   name = "${var.name_prefix}-user-pool"
 
-  # MFA configuration
-  mfa_configuration = "OPTIONAL"
-  software_token_mfa_configuration {
-    enabled = true
-  }
+  mfa_configuration = "OFF"
 
-  # Password policy
   password_policy {
-    minimum_length                   = 12
+    minimum_length                   = 8
     require_lowercase                = true
     require_numbers                  = true
-    require_symbols                  = true
-    require_uppercase                = true
+    require_symbols                  = false
+    require_uppercase                = false
     temporary_password_validity_days = 7
   }
 
-  # Account recovery
   account_recovery_setting {
     recovery_mechanism {
       name     = "verified_email"
@@ -28,11 +22,9 @@ resource "aws_cognito_user_pool" "main" {
     }
   }
 
-  # Attributes
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
 
-  # Schema
   schema {
     attribute_data_type      = "String"
     name                     = "email"
@@ -44,18 +36,10 @@ resource "aws_cognito_user_pool" "main" {
     }
   }
 
-  # Advanced security
-  user_pool_add_ons {
-    advanced_security_mode = "ENFORCED"
-  }
-
-  # Deletion protection
-  deletion_protection = "ACTIVE"
-
   tags = { Name = "${var.name_prefix}-user-pool" }
 }
 
-# Cliente de aplicación (API) que usan los microservicios para llamar a InitiateAuth y obtener el JWT del usuario.
+# Cliente de aplicación que usan los microservicios para llamar a InitiateAuth y obtener el JWT.
 resource "aws_cognito_user_pool_client" "api" {
   name         = "${var.name_prefix}-api-client"
   user_pool_id = aws_cognito_user_pool.main.id
@@ -70,7 +54,6 @@ resource "aws_cognito_user_pool_client" "api" {
     "ALLOW_REFRESH_TOKEN_AUTH",
   ]
 
-  # Token validity
   access_token_validity  = 1
   id_token_validity      = 1
   refresh_token_validity = 30
@@ -82,7 +65,7 @@ resource "aws_cognito_user_pool_client" "api" {
   }
 }
 
-# Dominio de Cognito (necesario para exponer el endpoint JWKS que los microservicios usan para validar el JWT).
+# Dominio de Cognito — expone el endpoint JWKS que los microservicios usan para validar los JWT.
 resource "aws_cognito_user_pool_domain" "main" {
   domain       = var.name_prefix
   user_pool_id = aws_cognito_user_pool.main.id

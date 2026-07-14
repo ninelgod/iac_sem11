@@ -1,7 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
+import { verifyRequestJWT } from "@/lib/jwt"
 
 export async function GET(request: NextRequest) {
+  if (!await verifyRequestJWT(request)) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+  }
+
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get("userId")
@@ -37,6 +42,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!await verifyRequestJWT(request)) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+  }
+
   try {
     const body = await request.json()
     const {

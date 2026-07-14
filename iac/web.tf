@@ -191,11 +191,15 @@ resource "aws_ecs_task_definition" "web" {
     }]
 
     environment = [
-      { name = "NODE_ENV",  value = "production" },
-      { name = "PORT",      value = "3000" },
-      { name = "HOSTNAME",  value = "0.0.0.0" },
-      { name = "DB_HOST",   value = module.aurora.cluster_endpoint },
-      { name = "DB_NAME",   value = var.db_name },
+      { name = "NODE_ENV",              value = "production" },
+      { name = "PORT",                  value = "3000" },
+      { name = "HOSTNAME",              value = "0.0.0.0" },
+      { name = "DB_HOST",               value = module.aurora.cluster_endpoint },
+      { name = "DB_NAME",               value = var.db_name },
+      { name = "AWS_REGION",            value = var.aws_region },
+      { name = "COGNITO_USER_POOL_ID",  value = module.cognito.user_pool_id },
+      { name = "COGNITO_CLIENT_ID",     value = module.cognito.client_id },
+      { name = "USUARIOS_SERVICE_URL",  value = "http://${module.alb.alb_dns_name}" },
     ]
 
     secrets = [

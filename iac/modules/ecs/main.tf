@@ -129,6 +129,16 @@ resource "aws_iam_role_policy" "task" {
         Action   = ["ssmmessages:CreateControlChannel", "ssmmessages:CreateDataChannel",
                     "ssmmessages:OpenControlChannel", "ssmmessages:OpenDataChannel"]
         Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:InitiateAuth",
+          "cognito-idp:AdminCreateUser",
+          "cognito-idp:AdminSetUserPassword",
+          "cognito-idp:AdminGetUser"
+        ]
+        Resource = [var.cognito_user_pool_arn]
       }
     ]
   })
@@ -166,6 +176,7 @@ resource "aws_ecs_task_definition" "service" {
         { name = "NODE_ENV",              value = "production" },
         { name = "PORT",                  value = tostring(each.value.port) },
         { name = "COGNITO_USER_POOL_ID",  value = var.cognito_user_pool_id },
+        { name = "COGNITO_CLIENT_ID",     value = var.cognito_client_id },
         { name = "AWS_REGION",            value = var.aws_region },
         { name = "DB_NAME",               value = var.db_name },
         { name = "DB_HOST",               value = var.aurora_endpoint }

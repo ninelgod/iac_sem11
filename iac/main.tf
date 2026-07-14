@@ -105,6 +105,8 @@ module "ecs" {
   kms_key_arn           = module.kms.secrets_key_arn
   secrets_arn           = module.secrets.db_secret_arn
   cognito_user_pool_id  = module.cognito.user_pool_id
+  cognito_client_id     = module.cognito.client_id
+  cognito_user_pool_arn = module.cognito.user_pool_arn
   aurora_endpoint       = module.aurora.cluster_endpoint
   db_name               = var.db_name
 }
