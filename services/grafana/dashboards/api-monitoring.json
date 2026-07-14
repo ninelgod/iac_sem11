@@ -1,0 +1,397 @@
+{
+  "annotations": { "list": [] },
+  "description": "Monitoreo de APIs de los microservicios via CloudWatch Logs",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] },
+          "unit": "short",
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^total$/", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "expression": "fields @timestamp, method | filter ispresent(method) | stats count() as total",
+          "logGroups": [
+            { "name": "/ecs/gestorpagosg2-prod/usuarios" },
+            { "name": "/ecs/gestorpagosg2-prod/pagos" },
+            { "name": "/ecs/gestorpagosg2-prod/reportes" }
+          ],
+          "queryMode": "Logs",
+          "refId": "A",
+          "region": "us-east-2"
+        }
+      ],
+      "title": "Total Requests",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          },
+          "unit": "short",
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^errores$/", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "expression": "fields @timestamp, status | filter ispresent(status) and status >= 400 | stats count() as errores",
+          "logGroups": [
+            { "name": "/ecs/gestorpagosg2-prod/usuarios" },
+            { "name": "/ecs/gestorpagosg2-prod/pagos" },
+            { "name": "/ecs/gestorpagosg2-prod/reportes" }
+          ],
+          "queryMode": "Logs",
+          "refId": "A",
+          "region": "us-east-2"
+        }
+      ],
+      "title": "Errores (4xx + 5xx)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 500 },
+              { "color": "red", "value": 2000 }
+            ]
+          },
+          "unit": "ms",
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^promedio$/", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "expression": "fields responseTime | filter ispresent(responseTime) | stats avg(responseTime) as promedio",
+          "logGroups": [
+            { "name": "/ecs/gestorpagosg2-prod/usuarios" },
+            { "name": "/ecs/gestorpagosg2-prod/pagos" },
+            { "name": "/ecs/gestorpagosg2-prod/reportes" }
+          ],
+          "queryMode": "Logs",
+          "refId": "A",
+          "region": "us-east-2"
+        }
+      ],
+      "title": "Tiempo Promedio de Respuesta",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
+      "id": 4,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "expression": "fields @timestamp, service | filter ispresent(method) and ispresent(service) | stats count() as requests by bin(5m), service",
+          "logGroups": [
+            { "name": "/ecs/gestorpagosg2-prod/usuarios" },
+            { "name": "/ecs/gestorpagosg2-prod/pagos" },
+            { "name": "/ecs/gestorpagosg2-prod/reportes" }
+          ],
+          "queryMode": "Logs",
+          "refId": "A",
+          "region": "us-east-2"
+        }
+      ],
+      "title": "Requests por Servicio en el Tiempo",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } }, "mappings": [] },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+      "id": 5,
+      "options": {
+        "displayLabels": ["percent"],
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "values": ["value", "percent"] },
+        "pieType": "donut",
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "expression": "fields service | filter ispresent(method) and ispresent(service) | stats count() as requests by service",
+          "logGroups": [
+            { "name": "/ecs/gestorpagosg2-prod/usuarios" },
+            { "name": "/ecs/gestorpagosg2-prod/pagos" },
+            { "name": "/ecs/gestorpagosg2-prod/reportes" }
+          ],
+          "queryMode": "Logs",
+          "refId": "A",
+          "region": "us-east-2"
+        }
+      ],
+      "title": "Trafico por Servicio",
+      "type": "piechart"
+    },
+    {
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineWidth": 1,
+            "scaleDistribution": { "type": "linear" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
+      "id": 6,
+      "options": {
+        "barRadius": 0.1,
+        "barWidth": 0.7,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "orientation": "auto",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": { "mode": "single", "sort": "none" },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 200
+      },
+      "targets": [
+        {
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "expression": "fields method | filter ispresent(method) | stats count() as requests by method | sort requests desc",
+          "logGroups": [
+            { "name": "/ecs/gestorpagosg2-prod/usuarios" },
+            { "name": "/ecs/gestorpagosg2-prod/pagos" },
+            { "name": "/ecs/gestorpagosg2-prod/reportes" }
+          ],
+          "queryMode": "Logs",
+          "refId": "A",
+          "region": "us-east-2"
+        }
+      ],
+      "title": "Metodos HTTP",
+      "type": "barchart"
+    },
+    {
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineWidth": 1,
+            "scaleDistribution": { "type": "linear" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 300 },
+              { "color": "red", "value": 400 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "status" }, "properties": [{ "id": "custom.width", "value": 80 }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
+      "id": 7,
+      "options": {
+        "barRadius": 0.1,
+        "barWidth": 0.7,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "orientation": "auto",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": { "mode": "single", "sort": "none" },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 200
+      },
+      "targets": [
+        {
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "expression": "fields status | filter ispresent(status) | stats count() as requests by status | sort requests desc",
+          "logGroups": [
+            { "name": "/ecs/gestorpagosg2-prod/usuarios" },
+            { "name": "/ecs/gestorpagosg2-prod/pagos" },
+            { "name": "/ecs/gestorpagosg2-prod/reportes" }
+          ],
+          "queryMode": "Logs",
+          "refId": "A",
+          "region": "us-east-2"
+        }
+      ],
+      "title": "Codigos de Estado HTTP",
+      "type": "barchart"
+    },
+    {
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 200 }
+            ]
+          },
+          "unit": "short",
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "id": 8,
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^requests$/", "values": true },
+        "showUnfilled": true,
+        "text": {}
+      },
+      "targets": [
+        {
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "expression": "fields url, service | filter ispresent(url) and ispresent(method) and url != \"/health\" | stats count() as requests by url, service | sort requests desc | limit 10",
+          "logGroups": [
+            { "name": "/ecs/gestorpagosg2-prod/usuarios" },
+            { "name": "/ecs/gestorpagosg2-prod/pagos" },
+            { "name": "/ecs/gestorpagosg2-prod/reportes" }
+          ],
+          "queryMode": "Logs",
+          "refId": "A",
+          "region": "us-east-2"
+        }
+      ],
+      "title": "Top 10 Endpoints mas Usados",
+      "type": "bargauge"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": ["monitoring", "api", "cloudwatch"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "API Monitoring",
+  "uid": "api-monitoring-v1",
+  "version": 1
+}

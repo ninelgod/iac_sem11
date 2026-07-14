@@ -1,4 +1,5 @@
 const express = require("express");
+const morgan = require("morgan");
 const { Pool } = require("pg");
 const { createRouter } = require("./routes/usuarios.routes");
 
@@ -6,6 +7,15 @@ function createApp(pool) {
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json());
+  app.use(morgan(function(tokens, req, res) {
+    return JSON.stringify({
+      service: "usuarios",
+      method: tokens.method(req, res),
+      url: tokens.url(req, res),
+      status: Number(tokens.status(req, res)),
+      responseTime: Number(tokens["response-time"](req, res))
+    });
+  }, { skip: (req) => req.url === "/health" }));
   app.use("/", createRouter(pool));
   return app;
 }
