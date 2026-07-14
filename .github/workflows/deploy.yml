@@ -143,6 +143,7 @@ jobs:
       TF_VAR_certificate_arn: ${{ secrets.CERTIFICATE_ARN }}
       TF_VAR_cloudfront_certificate_arn: ${{ secrets.CLOUDFRONT_CERTIFICATE_ARN }}
       TF_VAR_resend_api_key: ${{ secrets.RESEND_API_KEY }}
+      TF_VAR_grafana_admin_password: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
@@ -193,7 +194,7 @@ jobs:
 
     strategy:
       matrix:
-        service: [usuarios, pagos, reportes, web]
+        service: [usuarios, pagos, reportes, web, grafana]
 
     outputs:
       image-tag: ${{ steps.meta.outputs.tag }}
@@ -243,7 +244,7 @@ jobs:
 
     strategy:
       matrix:
-        service: [usuarios, pagos, reportes, web]
+        service: [usuarios, pagos, reportes, web, grafana]
 
     steps:
       - uses: actions/checkout@v4

@@ -135,6 +135,7 @@ resource "aws_cloudfront_response_headers_policy" "security_headers" {
 resource "aws_cloudfront_distribution" "frontend" {
   #checkov:skip=CKV_AWS_310:Origen unico S3 sirviendo contenido estatico; un origin_group de failover duplicado contra el mismo bucket no aporta redundancia real
   #checkov:skip=CKV2_AWS_47:El WAFv2 ACL asociado (modules/waf) ya incluye AWSManagedRulesKnownBadInputsRuleSet con cobertura Log4j; Checkov no resuelve la asociacion cross-module
+  #checkov:skip=CKV_AWS_305:El origen por defecto es el ALB (Next.js en ECS); default_root_object aplica solo a origenes S3 estaticos, no a backends dinamicos
   enabled         = true
   is_ipv6_enabled = true
   price_class     = "PriceClass_100"

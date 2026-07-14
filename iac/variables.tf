@@ -106,6 +106,12 @@ variable "resend_api_key" {
   sensitive   = true
 }
 
+variable "grafana_admin_password" {
+  description = "Grafana admin panel password"
+  type        = string
+  sensitive   = true
+}
+
 variable "skip_final_snapshot" {
   description = "Skip final snapshot on Aurora destroy. Set to true for dev/test to avoid snapshot name conflicts on repeated destroys"
   type        = bool

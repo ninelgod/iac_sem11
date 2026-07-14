@@ -34,7 +34,7 @@ module "ecr" {
   source      = "./modules/ecr"
   name_prefix = local.name_prefix
   kms_key_arn = module.kms.ecr_key_arn
-  services    = ["usuarios", "pagos", "reportes", "web"]
+  services    = ["usuarios", "pagos", "reportes", "web", "grafana"]
 }
 
 # Secrets Manager (credenciales de Aurora) + Lambda de rotación automática.
