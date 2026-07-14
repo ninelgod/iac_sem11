@@ -141,7 +141,7 @@ resource "aws_lb_listener_rule" "usuarios" {
   priority     = 100
 
   condition {
-    path_pattern { values = ["/api/usuarios/*", "/api/auth/*"] }
+    path_pattern { values = ["/api/usuarios", "/api/usuarios/*"] }
   }
 
   action {
@@ -192,7 +192,7 @@ resource "aws_lb_listener_rule" "usuarios_http" {
   priority     = 100
 
   condition {
-    path_pattern { values = ["/api/usuarios/*", "/api/auth/*"] }
+    path_pattern { values = ["/api/usuarios", "/api/usuarios/*", "/api/auth/*"] }
   }
 
   action {

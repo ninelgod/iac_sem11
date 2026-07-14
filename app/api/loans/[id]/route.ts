@@ -1,7 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
+import { verifyRequestJWT } from "@/lib/jwt"
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  if (!await verifyRequestJWT(request)) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+  }
   try {
     const loanId = Number.parseInt(params.id)
 
@@ -29,6 +33,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+  if (!await verifyRequestJWT(request)) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+  }
   try {
     const loanId = Number.parseInt(params.id)
     const body = await request.json()
@@ -116,6 +123,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  if (!await verifyRequestJWT(request)) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+  }
   try {
     const loanId = Number.parseInt(params.id)
 

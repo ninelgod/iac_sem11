@@ -1,7 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
+import { verifyRequestJWT } from "@/lib/jwt"
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+  if (!await verifyRequestJWT(request)) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+  }
   try {
     const body = await request.json()
     const { isPaid, lateFee, notes } = body
