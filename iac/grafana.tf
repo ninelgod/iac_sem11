@@ -125,6 +125,7 @@ resource "aws_iam_role" "grafana_task" {
 }
 
 resource "aws_iam_role_policy" "grafana_cloudwatch" {
+  #checkov:skip=CKV_AWS_355:CloudWatch metrics, Logs Insights y EC2 Describe requieren Resource=* porque no tienen ARN por recurso individual en estas acciones de consulta
   #checkov:skip=CKV_AWS_356:CloudWatch metrics, Logs Insights y EC2 Describe requieren Resource=* porque no tienen ARN por recurso individual en estas acciones de consulta
   name = "${local.name_prefix}-grafana-cloudwatch"
   role = aws_iam_role.grafana_task.id
