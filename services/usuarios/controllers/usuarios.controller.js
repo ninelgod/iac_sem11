@@ -46,6 +46,9 @@ function createUsuariosController(pool) {
         }));
 
         const tokens = authResult.AuthenticationResult;
+        if (!tokens) {
+          return res.status(401).json({ error: "Credenciales inválidas" });
+        }
 
         return res.json({
           user: {
