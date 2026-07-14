@@ -31,7 +31,7 @@
       "targets": [
         {
           "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
-          "expression": "fields @timestamp, method | filter ispresent(method) | stats count() as total",
+          "expression": "fields @timestamp, @message | filter @message like /\"method\":/ | stats count() as total",
           "logGroups": [
             { "name": "/ecs/gestorpagosg2-prod/usuarios" },
             { "name": "/ecs/gestorpagosg2-prod/pagos" },
@@ -76,7 +76,7 @@
       "targets": [
         {
           "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
-          "expression": "fields @timestamp, status | filter ispresent(status) and status >= 400 | stats count() as errores",
+          "expression": "fields @timestamp, @message | filter @message like /\"status\":[45]/ | stats count() as errores",
           "logGroups": [
             { "name": "/ecs/gestorpagosg2-prod/usuarios" },
             { "name": "/ecs/gestorpagosg2-prod/pagos" },
@@ -121,7 +121,7 @@
       "targets": [
         {
           "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
-          "expression": "fields responseTime | filter ispresent(responseTime) | stats avg(responseTime) as promedio",
+          "expression": "parse @message /\"responseTime\":(?P<responseTime>[0-9.]+)/ | stats avg(responseTime) as promedio",
           "logGroups": [
             { "name": "/ecs/gestorpagosg2-prod/usuarios" },
             { "name": "/ecs/gestorpagosg2-prod/pagos" },
@@ -174,7 +174,7 @@
       "targets": [
         {
           "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
-          "expression": "fields @timestamp, service | filter ispresent(method) and ispresent(service) | stats count() as requests by bin(5m), service",
+          "expression": "parse @message /\"service\":\"(?P<service>[^\"]+)\"/ | filter @message like /\"method\":/ | stats count() as requests by bin(5m), service",
           "logGroups": [
             { "name": "/ecs/gestorpagosg2-prod/usuarios" },
             { "name": "/ecs/gestorpagosg2-prod/pagos" },
@@ -205,7 +205,7 @@
       "targets": [
         {
           "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
-          "expression": "fields service | filter ispresent(method) and ispresent(service) | stats count() as requests by service",
+          "expression": "parse @message /\"service\":\"(?P<service>[^\"]+)\"/ | filter @message like /\"method\":/ | stats count() as requests by service",
           "logGroups": [
             { "name": "/ecs/gestorpagosg2-prod/usuarios" },
             { "name": "/ecs/gestorpagosg2-prod/pagos" },
@@ -260,7 +260,7 @@
       "targets": [
         {
           "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
-          "expression": "fields method | filter ispresent(method) | stats count() as requests by method | sort requests desc",
+          "expression": "parse @message /\"method\":\"(?P<method>[^\"]+)\"/ | filter ispresent(method) | stats count() as requests by method | sort requests desc",
           "logGroups": [
             { "name": "/ecs/gestorpagosg2-prod/usuarios" },
             { "name": "/ecs/gestorpagosg2-prod/pagos" },
@@ -324,7 +324,7 @@
       "targets": [
         {
           "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
-          "expression": "fields status | filter ispresent(status) | stats count() as requests by status | sort requests desc",
+          "expression": "parse @message /\"status\":(?P<status>[0-9]+)/ | filter ispresent(status) | stats count() as requests by status | sort requests desc",
           "logGroups": [
             { "name": "/ecs/gestorpagosg2-prod/usuarios" },
             { "name": "/ecs/gestorpagosg2-prod/pagos" },
@@ -370,7 +370,7 @@
       "targets": [
         {
           "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
-          "expression": "fields url, service | filter ispresent(url) and ispresent(method) and url != \"/health\" | stats count() as requests by url, service | sort requests desc | limit 10",
+          "expression": "parse @message /\"url\":\"(?P<url>[^\"]+)\"/ | parse @message /\"service\":\"(?P<service>[^\"]+)\"/ | filter @message like /\"method\":/ and url != \"/health\" | stats count() as requests by url, service | sort requests desc | limit 10",
           "logGroups": [
             { "name": "/ecs/gestorpagosg2-prod/usuarios" },
             { "name": "/ecs/gestorpagosg2-prod/pagos" },
