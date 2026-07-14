@@ -14,6 +14,7 @@ resource "random_password" "db_master" {
 
 # Secreto en Secrets Manager donde se guardan las credenciales de Aurora.
 resource "aws_secretsmanager_secret" "db" {
+  #checkov:skip=CKV2_AWS_57:La rotacion automatica fue deshabilitada porque la Lambda carecia de acceso al puerto 5432 de Aurora y fallaba en setSecret dejando credenciales inconsistentes. Ver comentario superior para alternativa productiva.
   name                    = "${var.name_prefix}/aurora/db-credentials"
   description             = "Aurora PostgreSQL master credentials"
   kms_key_id              = var.kms_key_arn
