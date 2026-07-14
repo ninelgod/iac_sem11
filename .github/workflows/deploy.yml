@@ -142,6 +142,7 @@ jobs:
       TF_VAR_alarm_email: ${{ vars.ALARM_EMAIL }}
       TF_VAR_certificate_arn: ${{ secrets.CERTIFICATE_ARN }}
       TF_VAR_cloudfront_certificate_arn: ${{ secrets.CLOUDFRONT_CERTIFICATE_ARN }}
+      TF_VAR_resend_api_key: ${{ secrets.RESEND_API_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -192,7 +193,7 @@ jobs:
 
     strategy:
       matrix:
-        service: [usuarios, pagos, reportes]
+        service: [usuarios, pagos, reportes, web]
 
     outputs:
       image-tag: ${{ steps.meta.outputs.tag }}
@@ -242,7 +243,7 @@ jobs:
 
     strategy:
       matrix:
-        service: [usuarios, pagos, reportes]
+        service: [usuarios, pagos, reportes, web]
 
     steps:
       - uses: actions/checkout@v4
@@ -282,35 +283,3 @@ jobs:
           wait-for-service-stability: true
           codedeploy-appspec: false
 
-  # DEPLOY FRONTEND — sube archivos estáticos a S3 e invalida CloudFront
-  deploy-frontend:
-    name: Deploy Frontend to S3
-    needs: [test, sonarqube, checkov, terraform]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Upload to S3
-        run: |
-          aws s3 sync . s3://gestorpagosg2-prod-web/ \
-            --exclude "*" \
-            --include "index.html" \
-            --delete \
-            --region ${{ env.AWS_REGION }}
-
-      - name: Invalidate CloudFront cache
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ needs.terraform.outputs.cloudfront_distribution_id }} \
-            --paths "/*"

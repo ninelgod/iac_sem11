@@ -100,6 +100,12 @@ variable "ecr_image_tag" {
   default     = "latest"
 }
 
+variable "resend_api_key" {
+  description = "Resend API key for email notifications in the Next.js web app"
+  type        = string
+  sensitive   = true
+}
+
 variable "skip_final_snapshot" {
   description = "Skip final snapshot on Aurora destroy. Set to true for dev/test to avoid snapshot name conflicts on repeated destroys"
   type        = bool

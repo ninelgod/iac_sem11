@@ -18,6 +18,10 @@ output "https_listener_arn" {
   value = aws_lb_listener.https.arn
 }
 
+output "http_listener_arn" {
+  value = aws_lb_listener.http_redirect.arn
+}
+
 output "target_group_arns" {
   description = "Map of service name to target group ARN"
   value = {

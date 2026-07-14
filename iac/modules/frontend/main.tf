@@ -101,28 +101,6 @@ resource "aws_s3_bucket_policy" "frontend" {
 }
 
 
-# CloudFront Function: reescribe rutas sin extension (las del router de la SPA) a /index.html ANTES de
-# llegar al origin. Reemplaza a custom_error_response (que es global y rompia los codigos 403/404 reales
-# que devuelve el ALB en /api/*) por algo scopeado solo al default_cache_behavior (S3/frontend).
-resource "aws_cloudfront_function" "spa_rewrite" {
-  name    = "${var.name_prefix}-spa-rewrite"
-  runtime = "cloudfront-js-2.0"
-  comment = "Rewrite de rutas SPA sin extension a index.html"
-  publish = true
-  code    = <<-EOT
-    function handler(event) {
-      var request = event.request;
-      var uri = request.uri;
-
-      if (!uri.includes('.')) {
-        request.uri = '/index.html';
-      }
-
-      return request;
-    }
-  EOT
-}
-
 # Headers de seguridad que CloudFront agrega a cada respuesta (HSTS, anti-clickjacking, anti-MIME-sniffing, etc.).
 resource "aws_cloudfront_response_headers_policy" "security_headers" {
   name = "${var.name_prefix}-security-headers"
@@ -157,10 +135,9 @@ resource "aws_cloudfront_response_headers_policy" "security_headers" {
 resource "aws_cloudfront_distribution" "frontend" {
   #checkov:skip=CKV_AWS_310:Origen unico S3 sirviendo contenido estatico; un origin_group de failover duplicado contra el mismo bucket no aporta redundancia real
   #checkov:skip=CKV2_AWS_47:El WAFv2 ACL asociado (modules/waf) ya incluye AWSManagedRulesKnownBadInputsRuleSet con cobertura Log4j; Checkov no resuelve la asociacion cross-module
-  enabled             = true
-  is_ipv6_enabled     = true
-  default_root_object = "index.html"
-  price_class         = "PriceClass_100"
+  enabled         = true
+  is_ipv6_enabled = true
+  price_class     = "PriceClass_100"
   aliases             = [var.domain_name]
   web_acl_id          = var.waf_acl_arn
   wait_for_deployment = false
@@ -185,27 +162,19 @@ resource "aws_cloudfront_distribution" "frontend" {
     }
   }
 
+  # El ALB es ahora el origen por defecto: Next.js (ECS) sirve tanto las páginas como las APIs.
+  # CachingDisabled + AllViewer para que cada request llegue al contenedor sin cache y con
+  # todos los headers (cookies de sesión, Authorization, etc.).
   default_cache_behavior {
-    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
     cached_methods         = ["GET", "HEAD"]
-    target_origin_id       = "S3-${aws_s3_bucket.frontend.id}"
+    target_origin_id       = "ALB-${var.name_prefix}"
     viewer_protocol_policy     = "redirect-to-https"
     compress                   = true
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security_headers.id
 
-    forwarded_values {
-      query_string = false
-      cookies { forward = "none" }
-    }
-
-    function_association {
-      event_type   = "viewer-request"
-      function_arn = aws_cloudfront_function.spa_rewrite.arn
-    }
-
-    min_ttl     = 0
-    default_ttl = 86400
-    max_ttl     = 31536000
+    cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # AWS Managed-CachingDisabled
+    origin_request_policy_id = "216adef6-5c7f-47e4-b989-5492eafa07d3" # AWS Managed-AllViewer
   }
 
   # Trafico dinamico: cualquier request a /api/* se manda al ALB (no a S3), sin cache, reenviando todo (headers/cookies/query string) porque son llamadas a los microservicios.

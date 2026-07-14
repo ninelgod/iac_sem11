@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+iac
+sonarqube
+services/*/node_modules
+**/.env
+**/.env.local
+*.md
