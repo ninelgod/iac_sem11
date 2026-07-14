@@ -199,7 +199,7 @@ resource "aws_ecs_task_definition" "web" {
       { name = "AWS_REGION",            value = var.aws_region },
       { name = "COGNITO_USER_POOL_ID",  value = module.cognito.user_pool_id },
       { name = "COGNITO_CLIENT_ID",     value = module.cognito.client_id },
-      { name = "USUARIOS_SERVICE_URL",  value = "http://${module.alb.alb_dns_name}" },
+      { name = "USUARIOS_SERVICE_URL",  value = "http://usuarios:3000" },
     ]
 
     secrets = [
@@ -248,6 +248,11 @@ resource "aws_ecs_service" "web" {
     target_group_arn = aws_lb_target_group.web.arn
     container_name   = "web"
     container_port   = 3000
+  }
+
+  service_connect_configuration {
+    enabled   = true
+    namespace = module.ecs.service_connect_namespace_arn
   }
 
   lifecycle {
