@@ -1,8 +1,7 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 export async function sendPasswordResetCode(email: string, code: string) {
+  const resend = new Resend(process.env.RESEND_API_KEY)
   try {
     const { data, error } = await resend.emails.send({
       from: 'Gestor de Préstamos <no-reply@coretoolslab.com>',
