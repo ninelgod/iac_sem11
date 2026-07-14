@@ -7,6 +7,7 @@ function createRouter(pool) {
 
   router.get("/health", ctrl.health);
   router.post("/api/auth/login", ctrl.login);
+  router.post("/api/usuarios/auth/login", ctrl.login);
   router.post("/api/auth/change-password", ctrl.changePassword);
   router.post("/api/auth/request-password-reset", ctrl.requestPasswordReset);
   router.post("/api/auth/verify-reset-code", ctrl.verifyResetCode);

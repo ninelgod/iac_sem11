@@ -13,7 +13,7 @@ export interface AuthResult {
 export async function validateUser(username: string, password: string): Promise<AuthResult> {
   const serviceUrl = process.env.USUARIOS_SERVICE_URL || "http://localhost:3000"
 
-  const response = await fetch(`${serviceUrl}/api/auth/login`, {
+  const response = await fetch(`${serviceUrl}/api/usuarios/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
